@@ -1,0 +1,25 @@
+deepspeed   --include "localhost:0,1" /home/yuhaiyang/zlw/LatentDoc/latentdoc/train/train_resnet_opt_v2.py   \
+            --deepspeed /home/yuhaiyang/zlw/Vary-toy-main/Vary-master/zero_config/zero2.json \
+            --model_name_or_path /home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m                           \
+            --freeze_vision_encoder True    \
+            --freeze_lm_model False      \
+            --bf16 True                \
+            --per_device_eval_batch_size 16  \
+            --gradient_accumulation_steps 1     \
+            --evaluation_strategy "no"    \
+            --save_strategy "steps"    \
+            --save_steps 5000    \
+            --save_total_limit 1   \
+            --weight_decay 0.    \
+            --warmup_ratio 0.03   \
+            --lr_scheduler_type "cosine"    \
+            --logging_steps 1 --tf32 True   \
+            --model_max_length 4096    \
+            --gradient_checkpointing True     \
+            --dataloader_num_workers 8      \
+            --report_to none       \
+            --per_device_train_batch_size 4   \
+            --num_train_epochs 8         \
+            --learning_rate 5e-3        \
+            --datasets  test    \
+            --output_dir /home/yuhaiyang/zlw/LatentDoc/exps/baseline     \

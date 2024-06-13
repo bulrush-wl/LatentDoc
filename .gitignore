@@ -1,0 +1,12 @@
+*.py[cod]
+*.so
+*.egg
+*.egg-info
+exps
+dist
+build
+.history
+__pycache__
+workdir
+*.pth
+*.pt
