@@ -1,0 +1,43 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["--model_name_or_path", "/home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m", 
+                    "--vision_encoder", "/home/yuhaiyang/zlw/pretrained_weight/Resnet/resnet152-394f9c45.pth",
+                    "--freeze_vision_encoder", "False",
+                    "--freeze_lm_model", "False",
+                    "--bf16", "True",
+                    "--per_device_train_batch_size", "1",
+                    "--gradient_accumulation_steps", "1",
+                    "--evaluation_strategy", "no",
+                    "--save_strategy",  "steps",
+                    "--save_steps", "50",
+                    "--weight_decay",  "0.",    
+                    "--warmup_ratio", "0.03",
+                    "--lr_scheduler_type", "cosine",   
+                    "--logging_steps", "1", "--tf32", "True",  
+                    "--model_max_length", "2048",    
+                    "--gradient_checkpointing", "False",     
+                    "--dataloader_num_workers", "8",   
+                    "--report_to", "none",
+                    "--per_device_train_batch_size", "1",
+                    "--num_train_epochs", "800000",
+                    "--learning_rate", "5e-3",    
+                    "--datasets",  "test2",
+                    "--output_dir", "/home/yuhaiyang/zlw/LatentDoc/exps/test2",
+                    "--report_to", "none",
+                    ],
+            "env":{
+                "CUDA_VISIBLE_DEVICES": "0",
+            }
+        }
+    ]
+}

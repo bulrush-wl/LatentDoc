@@ -32,7 +32,7 @@ from latentdoc.utils.utils import disable_torch_init, KeywordsStoppingCriteria
 from latentdoc.data import make_supervised_data_module
 from latentdoc.model.resnet_opt_v2 import LatentDocOPTForCausalLM, LatentDocConfig
 from latentdoc.train.trainer_vit_fixlr import varyTrainer
-from latentdoc.model.vision_encoder.resnet import build_transforms
+from latentdoc.model.vision_encoder.resnet import build_train_transforms
 
 
 def load_image(image_file):
@@ -50,14 +50,15 @@ def init_model(model_name_or_path, device='cuda', dtype=torch.bfloat16):
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
     tokenizer, mm_cfg = model.init_multimodal_module(tokenizer)
-    img_processor = build_transforms()
+    mm_cfg = edict(mm_cfg) 
+    img_processor = build_train_transforms(mm_cfg.img_size)
     
     # print(model.config)
     # print(type(model.config))
     # print(type(model.config.multimodal_cfg))
     # print(type(mm_cfg))
 
-    return model, tokenizer, img_processor, edict(mm_cfg) 
+    return model, tokenizer, img_processor, mm_cfg
    
 
 

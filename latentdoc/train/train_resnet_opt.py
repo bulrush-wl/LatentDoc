@@ -24,48 +24,82 @@ import torch
 import transformers
 from easydict import EasyDict as edict
 
-from latentdoc.model.resnet_opt import Rsenet_OPT
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
-from latentdoc.train.trainer_vit_fixlr import varyTrainer
+from latentdoc.train.latentdoc_trainer import LatentDocTrainer
+from latentdoc.model.resnet_opt import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.vision_encoder.resnet import build_train_transforms
 
 
-DEFAULT_IMAGE_TOKEN = '<image>'
-DEFAULT_IMAGE_PATCH_TOKEN = '<imgpad>'
-DEFAULT_IMG_START_TOKEN = '<img>'
-DEFAULT_IMG_END_TOKEN = '</img>'
-DEFAULT_IM_START_TOKEN = '<|im_start|>'
-DEFAULT_IM_END_TOKEN = '<|im_end|>' 
-IGNORE_INDEX = -100
 
-special_tokens = {
-            'img_token': '<image>',
-            'img_patch_token': '<img_patch>',
-            'im_start_token': '<|im_start|>',
-            'im_end_token': '<|im_end|>' ,
-            'img_start_token': '<img>',
-            'img_end_token': '</img>',
-    }
+def build_mm_cfg():
+    DEFAULT_IMAGE_TOKEN = '<image>'
+    DEFAULT_IMAGE_PATCH_TOKEN = '<imgpad>'
+    DEFAULT_IMG_START_TOKEN = '<img>'
+    DEFAULT_IMG_END_TOKEN = '</img>'
+    DEFAULT_IM_START_TOKEN = '<|im_start|>'
+    DEFAULT_IM_END_TOKEN = '<|im_end|>' 
+    IGNORE_INDEX = -100
 
-multimodal_cfg = {
-        'img_token_len': 256,
-        'model_max_length': 4096,
-        'output_attentions': True,
-        'output_hidden_states': True,
-        'return_dict': True,
-        'special_tokens': special_tokens
-    }
+    special_tokens = {
+                'img_token': '<image>',
+                'img_patch_token': '<img_patch>',
+                'im_start_token': '<|im_start|>',
+                'im_end_token': '<|im_end|>' ,
+                'img_start_token': '<img>',
+                'img_end_token': '</img>',
+        }
 
-multimodal_cfg = edict(multimodal_cfg)
+    mm_cfg = {
+            'img_token_len': 256,
+            'model_max_length': 2048,
+            'output_attentions': True,
+            'output_hidden_states': True,
+            'img_size': 512,
+            'return_dict': True,
+            'special_tokens': special_tokens
+        }
+
+    mm_cfg = edict(mm_cfg)
+    return mm_cfg
+
+def init_tokenizer(model_name_or_path, mm_cfg):
+    tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
+    num_new_tokens = tokenizer.add_special_tokens({
+            'additional_special_tokens': list(mm_cfg.special_tokens.values())
+            })
+
+    mm_cfg.img_patch_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_patch_token)
+    mm_cfg.im_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_start_token)
+    mm_cfg.im_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_end_token)
+    mm_cfg.img_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_start_token)
+    mm_cfg.img_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_end_token)
+
+    return tokenizer, mm_cfg
 
 def train():
-
+    
+    # parse the argument 
     parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    model = Rsenet_OPT(multimodal_cfg)
+    # build and init the mmcfg 
+    mm_cfg = build_mm_cfg()
+    mm_cfg.model_max_length = training_args.model_max_length
+    mm_cfg.vision_encoder = model_args.vision_encoder
+    mm_cfg.img_size = model_args.img_size
+    
+    # build and init the tokenizer
+    tokenizer, mm_cfg = init_tokenizer(model_args.model_name_or_path, mm_cfg)
 
-    img_processor, tokenizer = model.get_img_processor(), model.get_tokenizer()
+    # build the img_processor
+    img_processor = build_train_transforms(img_size=mm_cfg.img_size)
+
+    # build and init the model
+    model = LatentDocOPTForCausalLM.from_pretrained(model_args.model_name_or_path)
+    model.train()
+    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
+
 
     dtype = torch.float32
     if training_args.fp16:
@@ -77,8 +111,8 @@ def train():
 
   
     if model_args.freeze_lm_model:
-        model.llm.requires_grad_(False)
-        for p in model.llm.get_input_embeddings().parameters():
+        model.model.requires_grad_(False)
+        for p in model.model.get_input_embeddings().parameters():
             p.requires_grad = True
     
     if model_args.freeze_vision_encoder:
@@ -93,21 +127,23 @@ def train():
         data_args=data_args,
         tokenizer=tokenizer, 
         img_processor=img_processor,
-        multimodal_cfg = multimodal_cfg
+        multimodal_cfg = mm_cfg
     )
 
-    
-    trainer = varyTrainer(
+    # ds = data_module['train_dataset']
+    # print(ds[0])
+    trainer = LatentDocTrainer(
         model=model,
         tokenizer=tokenizer,
         args=training_args,
         **data_module)
 
-    
+
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
     else:
         trainer.train()
+        
     trainer.save_state()
     trainer._safe_save(output_dir=training_args.output_dir)
 

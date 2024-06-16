@@ -125,6 +125,7 @@ class SimpleConversationDateset(Dataset):
 
             rounds.append(r0+r1)
 
+        # print(rounds)
         # add the begin and end token
         rounds[0] = self.tokenizer.bos_token + rounds[0]
         rounds[-1] = rounds[-1] + self.tokenizer.eos_token 
@@ -197,6 +198,7 @@ class SimpleConversationDateset(Dataset):
 
         # process conversations
         conversations = self.multimodal_process(data["conversations"])
+
         data_dict = self.token_preprocess(conversations)
         data_dict = dict(input_ids=data_dict["input_ids"], labels=data_dict["labels"])
 
@@ -217,7 +219,7 @@ class SimpleConversationDateset(Dataset):
             return self.__getitem__(0)
 
         data_dict['images'] = image
-
+        
         return data_dict
 
 
@@ -249,15 +251,15 @@ def test():
     tokenizer.add_special_tokens({
         'additional_special_tokens': list(multimodal_cfg['special_tokens'].values())
     })
-    print(tokenizer.convert_tokens_to_ids(tokenizer.bos_token))
+    # print(tokenizer.convert_tokens_to_ids(tokenizer.bos_token))
     # print(tokenizer.bos_token)
     # print(tokenizer.eos_token)
     # print(tokenizer.pad_token)
-    # multimodal_cfg = edict(multimodal_cfg)
-    # img_processor, _ = build_resnet152_and_img_processor()
+    multimodal_cfg = edict(multimodal_cfg)
+    img_processor, _ = build_resnet152_and_img_processor()
 
-    # ds = SimpleConversationDateset(datasets='zhongtie_doc', img_processor=img_processor, tokenizer=tokenizer, multimodal_cfg=multimodal_cfg)
-    # data = ds[0]
+    ds = SimpleConversationDateset(datasets='zhongtie_doc', img_processor=img_processor, tokenizer=tokenizer, multimodal_cfg=multimodal_cfg)
+    data = ds[0]
 
     # input_ids = data['input_ids']
     # labels = data['labels']

@@ -1,11 +1,34 @@
 import os
 import torch
 import torch.nn as nn
-
+import math
 from transformers import Trainer
 from transformers.trainer_pt_utils import get_parameter_names
+from transformers import get_scheduler
 from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
 from typing import Dict, Optional, Sequence
+
+from torch.optim.lr_scheduler import _LRScheduler
+
+
+class WarmupCosineRestartLR(_LRScheduler):
+    def __init__(self, optimizer, warmup_epochs, max_epochs, restart_epochs, min_lr=0, last_epoch=-1):
+        self.warmup_epochs = warmup_epochs
+        self.max_epochs = max_epochs
+        self.restart_epochs = restart_epochs
+        self.min_lr = min_lr
+        super(WarmupCosineRestartLR, self).__init__(optimizer, last_epoch)
+        
+    def get_lr(self):
+        current_epoch = self.last_epoch % self.restart_epochs
+        if current_epoch < self.warmup_epochs:
+            # Warmup phase
+            warmup_factor = float(current_epoch) / float(max(1, self.warmup_epochs))
+            return [base_lr * warmup_factor for base_lr in self.base_lrs]
+        else:
+            # Cosine annealing phase
+            cosine_factor = 0.5 * (1 + math.cos(math.pi * (current_epoch - self.warmup_epochs) / (self.restart_epochs - self.warmup_epochs)))
+            return [self.min_lr + (base_lr - self.min_lr) * cosine_factor for base_lr in self.base_lrs]
 
 
 def unwrap_model(model: nn.Module) -> nn.Module:
@@ -24,7 +47,7 @@ def unwrap_model(model: nn.Module) -> nn.Module:
         return model
 
 
-class varyTrainer(Trainer):
+class LatentDocTrainer(Trainer):
 
     def _safe_save(self, output_dir: str):
         """Collects the state dict and dump to disk."""
@@ -36,7 +59,6 @@ class varyTrainer(Trainer):
             }
             del state_dict
             self._save(output_dir, state_dict=cpu_state_dict)  # noqa
-
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         if getattr(self.args, 'tune_mm_mlp_adapter', False):
@@ -62,7 +84,7 @@ class varyTrainer(Trainer):
             else:
                 torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
 
-        super(varyTrainer, self)._save(output_dir, state_dict)
+        super(LatentDocTrainer, self)._save(output_dir, state_dict)
 
     def create_optimizer(self):
         """
@@ -110,3 +132,32 @@ class varyTrainer(Trainer):
             self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
 
         return self.optimizer
+
+    def create_scheduler(self, num_training_steps: int, optimizer: torch.optim.Optimizer = None):
+        """
+        Setup the scheduler. The optimizer of the trainer must have been set up either before this method is called or
+        passed as an argument.
+
+        Args:
+            num_training_steps (int): The number of training steps to do.
+
+        """
+        """
+        Setup the scheduler. The optimizer of the trainer must have been set up either before this method is called or
+        passed as an argument.
+
+        Args:
+            num_training_steps (int): The number of training steps to do.
+        """
+        if self.lr_scheduler is None:
+            # self.args.lr_scheduler_kwargs = {'num_cycles': self.args.num_cycles}
+            self.lr_scheduler = get_scheduler(
+                self.args.lr_scheduler_type,
+                optimizer=self.optimizer if optimizer is None else optimizer,
+                num_warmup_steps=self.args.get_warmup_steps(num_training_steps),
+                num_training_steps=num_training_steps,
+                # scheduler_specific_kwargs={'num_cycles': self.args.num_cycles},
+            )
+            self._created_lr_scheduler = True
+        return self.lr_scheduler
+        

@@ -215,7 +215,6 @@ def test1():
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=300)
     
     special_tokens = {
-            'img_token': '<s>',
             'img_patch_token': '<img_patch>',
             'im_start_token': '<|im_start|>',
             'im_end_token': '<|im_end|>' ,
@@ -230,20 +229,15 @@ def test1():
     # print(num)
     # print(len(tokenizer))
 
-    print(tokenizer.convert_tokens_to_ids('<s>'))
+    print(tokenizer.convert_tokens_to_ids('<img_patch>'))
+
+    num = tokenizer.add_special_tokens({
+        'additional_special_tokens': list(special_tokens.values())
+    })
+    print(tokenizer.convert_tokens_to_ids('<img_patch>'))
+
 
 if __name__ == '__main__':
-    from easydict import EasyDict as edict
-    a = {
-        'img_token': '<image>',
-        'img_patch_token': '<img_patch>',
-        'im_start_token': '<|im_start|>',
-        'im_end_token': '<|im_end|>' ,
-        'img_start_token': '<img>',
-        'img_end_token': '</img>',
-    }
-    a = edict(a)
-    print(list(a.values()))
-    pass
+    test1()
 
     

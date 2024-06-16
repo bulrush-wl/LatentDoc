@@ -538,7 +538,7 @@ class Bottleneck(nn.Module):
 
 
 '''
-remove the avgpool and the final fc layer
+remove the avgpool and the final fc layer, and b,c,h,w -> b,l,c
 '''
 class ResNet(nn.Module):
     def __init__(
@@ -651,6 +651,10 @@ class ResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
+
+
+        # bchw -> blc
+        x = x.flatten(2).permute(0, 2, 1)
 
         # x = self.avgpool(x)
         # x = torch.flatten(x, 1)
@@ -810,9 +814,11 @@ def build_resnet50_and_img_processor():
 
     return transforms(crop_size=512, resize_size=512), resnet50(weights=weight_path, )
 
-def build_transforms(crop_size=512, resize_size=512):
-    
-    return transforms(crop_size=crop_size, resize_size=resize_size)
+def build_train_transforms(img_size=512):
+    return transforms(crop_size=img_size, resize_size=img_size)
+
+def build_test_transforms(img_size=512):
+    return transforms(crop_size=img_size, resize_size=img_size)
 
 def build_resnet152():
 
