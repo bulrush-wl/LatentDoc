@@ -142,22 +142,21 @@ class LatentDocTrainer(Trainer):
             num_training_steps (int): The number of training steps to do.
 
         """
-        """
-        Setup the scheduler. The optimizer of the trainer must have been set up either before this method is called or
-        passed as an argument.
-
-        Args:
-            num_training_steps (int): The number of training steps to do.
-        """
         if self.lr_scheduler is None:
             # self.args.lr_scheduler_kwargs = {'num_cycles': self.args.num_cycles}
-            self.lr_scheduler = get_scheduler(
-                self.args.lr_scheduler_type,
-                optimizer=self.optimizer if optimizer is None else optimizer,
-                num_warmup_steps=self.args.get_warmup_steps(num_training_steps),
-                num_training_steps=num_training_steps,
-                # scheduler_specific_kwargs={'num_cycles': self.args.num_cycles},
-            )
-            self._created_lr_scheduler = True
+            if self.args.lr_scheduler_type == 'cosine_with_restarts':
+                warmup_steps = int(self.args.warmup_ratio * num_training_steps)
+                restart_steps = int(num_training_steps / self.args.num_train_epochs)
+                self.lr_scheduler = WarmupCosineRestartLR(self.optimizer, warmup_steps, num_training_steps, restart_steps)
+
+            else:
+                self.lr_scheduler = get_scheduler(
+                    self.args.lr_scheduler_type,
+                    optimizer=self.optimizer if optimizer is None else optimizer,
+                    num_warmup_steps=self.args.get_warmup_steps(num_training_steps),
+                    num_training_steps=num_training_steps,
+                )
+
+        self._created_lr_scheduler = True
         return self.lr_scheduler
         

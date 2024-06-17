@@ -29,7 +29,6 @@ class DataArguments:
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
     resume: Optional[str] = field(default=None)
-    num_cycles: int = field(default=1)
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
     remove_unused_columns: bool = field(default=False)

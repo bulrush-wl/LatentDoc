@@ -1,7 +1,8 @@
-deepspeed   --include "localhost:2" --master_port 29500 /home/yuhaiyang/zlw/LatentDoc/latentdoc/train/train_resnet_opt.py   \
+deepspeed   --include "localhost:2" --master_port 29500 /home/yuhaiyang/zlw/LatentDoc/latentdoc/train/train_sam_opt_1024.py   \
             --deepspeed /home/yuhaiyang/zlw/Vary-toy-main/Vary-master/zero_config/zero2.json \
             --model_name_or_path /home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m                           \
-            --vision_encoder /home/yuhaiyang/zlw/pretrained_weight/Resnet/resnet152-394f9c45.pth \
+            --vision_encoder /home/yuhaiyang/zlw/pretrained_weight/sam_vit_b_01ec64.pth \
+            --img_size 1024   \
             --freeze_vision_encoder True    \
             --freeze_lm_model False      \
             --bf16 True                \
@@ -13,7 +14,6 @@ deepspeed   --include "localhost:2" --master_port 29500 /home/yuhaiyang/zlw/Late
             --save_total_limit 1   \
             --weight_decay 0.    \
             --warmup_ratio 0.03   \
-            --num_cycles 2 \
             --lr_scheduler_type 'cosine_with_restarts' \
             --logging_steps 1 --tf32 True   \
             --model_max_length 2048    \
@@ -24,4 +24,4 @@ deepspeed   --include "localhost:2" --master_port 29500 /home/yuhaiyang/zlw/Late
             --num_train_epochs 2         \
             --learning_rate 5e-3        \
             --datasets  zhongtie_doc    \
-            --output_dir /home/yuhaiyang/zlw/LatentDoc/exps/resnet_deepspeed_cosine_with_restarts_cycles    \
+            --output_dir /home/yuhaiyang/zlw/LatentDoc/exps/sam_deepspeed_cosine_with_restarts_self    \
