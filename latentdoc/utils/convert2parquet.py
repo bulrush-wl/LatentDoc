@@ -36,7 +36,7 @@ import pyarrow as pa
 import io
 from latentdoc.model.vision_encoder.sam import build_train_transforms
 
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 
 def encode_img(img_pil):
     img_byte_arr = io.BytesIO()
@@ -45,7 +45,7 @@ def encode_img(img_pil):
     return img_byte_arr
 
 def decode_img(img_byte):
-    image = Image.open(io.BytesIO(img_byte_arr))
+    image = Image.open(io.BytesIO(img_byte))
     return image
 
 def build_mm_cfg():
@@ -168,10 +168,25 @@ def build_parquet():
                     f, ensure_ascii=False)
 
 def read_parquet():
-    path = '/home/yuhaiyang/zlw/dataset/zhongtie_doc/parquet/file_name_0.parquet'
-    ds = load_dataset('parquet', data_files=path)['train']
-    print(ds[0])
+    path1 = '/home/yuhaiyang/zlw/dataset/zhongtie_doc/parquet/zhongtie_doc_0.parquet'
+    path2 = '/home/yuhaiyang/zlw/dataset/zhongtie_doc/parquet/zhongtie_doc_1.parquet'
+    ds1 = load_dataset('parquet', data_files=path1)['train']
+    ds2 = load_dataset('parquet', data_files=path2)['train']
+    print(len(ds1))
+    print(len(ds2))
+    ds = concatenate_datasets([ds1, ds2])
+    print(len(ds))
+    data = ds[0]
+    img = data['image']
+    input_ids = data['input_ids']
+    labels = data['labels']
+    raw_data = data['raw_data']
+
+    img = decode_img(img).save('./test.png')
+    print(input_ids)
+    print(labels)
+    print(raw_data)
 
 
 if __name__ == "__main__":
-    build_parquet()
+    read_parquet()
