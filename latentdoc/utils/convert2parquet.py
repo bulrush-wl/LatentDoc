@@ -123,11 +123,11 @@ def convert_to_parquet(ds, path_root, file_name, num_size=1024, row_group_size=3
         input_ids = item['input_ids'].numpy().astype(int)
         labels = item['labels'].numpy().astype(int)
         raw_data = item['raw_data']
-        img_path = raw_data['image']
-        # print(img_path)
+        img_name = raw_data['image']
+        # print(img_name)
         pq_data.append(
             {
-                'image': encode_img(images),
+                'img_name': img_name,
                 'input_ids': input_ids,
                 'labels': labels,
                 'raw_data': raw_data,
@@ -189,4 +189,4 @@ def read_parquet():
 
 
 if __name__ == "__main__":
-    read_parquet()
+    build_parquet()
