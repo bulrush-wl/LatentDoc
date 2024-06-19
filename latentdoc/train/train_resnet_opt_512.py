@@ -27,7 +27,7 @@ from easydict import EasyDict as edict
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
-from latentdoc.model.resnet_opt import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.resnet_opt_512 import LatentDocOPTForCausalLM, LatentDocConfig
 from latentdoc.model.vision_encoder.resnet import build_train_transforms
 
 

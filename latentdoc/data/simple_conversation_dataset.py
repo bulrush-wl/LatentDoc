@@ -34,7 +34,7 @@ DATASET_INFO = {
     },
 
     'pdf_en_30k': {
-        'images': '/home/fdu02/fdu02_dir/lw/data/vary-600k/data/pdf_data/pdf_en_30w',
+        'images': '/home/fdu02/fdu02_dir/lw/data/vary-600k/data/pdf_data/pdf_en_30w/',
         'annotations': '/home/fdu02/fdu02_dir/lw/data/vary-600k/pdf_en_conv_30w_v2.json',
     },
 }

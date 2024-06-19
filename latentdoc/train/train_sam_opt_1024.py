@@ -55,7 +55,7 @@ def build_mm_cfg():
             'model_max_length': 2048,
             'output_attentions': True,
             'output_hidden_states': True,
-            'img_size': 512,
+            'img_size': 1024,
             'return_dict': True,
             'special_tokens': special_tokens
         }

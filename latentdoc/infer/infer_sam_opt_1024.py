@@ -26,13 +26,9 @@ import transformers
 from transformers import TextStreamer
 from easydict import EasyDict as edict
 
-from latentdoc.model.resnet_opt import Rsenet_OPT
-from latentdoc.utils.arguments import *
 from latentdoc.utils.utils import disable_torch_init, KeywordsStoppingCriteria
-from latentdoc.data import make_supervised_data_module
-from latentdoc.model.resnet_opt_v2 import LatentDocOPTForCausalLM, LatentDocConfig
-from latentdoc.train.trainer_vit_fixlr import varyTrainer
-from latentdoc.model.vision_encoder.resnet import build_train_transforms
+from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.vision_encoder.sam import build_test_transforms
 
 
 def load_image(image_file):
@@ -51,7 +47,7 @@ def init_model(model_name_or_path, device='cuda', dtype=torch.bfloat16):
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
     tokenizer, mm_cfg = model.init_multimodal_module(tokenizer)
     mm_cfg = edict(mm_cfg) 
-    img_processor = build_train_transforms(mm_cfg.img_size)
+    img_processor = build_test_transforms(mm_cfg.img_size)
     
     # print(model.config)
     # print(type(model.config))
@@ -96,8 +92,11 @@ def infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg, dev
             max_new_tokens=4096,
             stopping_criteria=[stopping_criteria]
             )
-
-
+    output = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).strip()
+    output = output.replace(mm_cfg.special_tokens.im_end_token, '')
+    output = output.replace(tokenizer.eos_token, '')
+    print(output)
+    # print(output_ids)
 
 def infer_from_arg():
 
@@ -107,10 +106,11 @@ def infer_from_arg():
     parser.add_argument("--prompt", type=str, required=False )
     args = parser.parse_args()
 
-    args.model_weight_path = '/home/yuhaiyang/zlw/LatentDoc/exps/test2/checkpoint-3000'
+    args.model_weight_path = '/home/yuhaiyang/zlw/LatentDoc/exps/sam_deepspeed_cosine_with_restarts_self/checkpoint-2000'
     args.image_file = '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/sample_ch.png'
     args.prompt = 'Read all the text in the img.'
     model, tokenizer, img_processor, mm_cfg = init_model(args.model_weight_path)
+
     infer_one_img(args.image_file, args.prompt, model, tokenizer, img_processor, mm_cfg)
     
     

@@ -6,7 +6,7 @@ import transformers
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
-    vision_encoder: Optional[str] = field(default="~/.cache/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff/")
+    vision_encoder: Optional[str] = field(default="")
     img_size: int = field(default=512)
     use_cache: bool = field(default=False)
     freeze_vision_encoder: bool = field(default=False)
