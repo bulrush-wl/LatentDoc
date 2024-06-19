@@ -77,8 +77,7 @@ pip install -e .
 2. Run the training script
    - there are some template scripts in the LatentDoc/scripts
    ```sh
-   deepspeed   --include "localhost:0123"  \
-            --master_port 29501         \
+   deepspeed   --include "localhost:0,1,2,3"  --master_port 29500       \
              path/LatentDoc/latentdoc/train/train_sam_opt_1024.py   \
             --deepspeed path/LatentDoc/zero_config/zero0.json \
             --model_name_or_path path/opt125                   \
