@@ -26,7 +26,17 @@ DATASET_INFO = {
     'test2': {
         'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
         'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test2.json',
-    }
+    },
+    
+    'pdf_cn_30k': {
+        'images': '/home/fdu02/fdu02_dir/lw/data/vary-600k/data/pdf_data/pdf_cn_30w/',
+        'annotations': '/home/fdu02/fdu02_dir/lw/data/vary-600k/pdf_cn_conv_30w_v2.json',
+    },
+
+    'pdf_en_30k': {
+        'images': '/home/fdu02/fdu02_dir/lw/data/vary-600k/data/pdf_data/pdf_en_30w',
+        'annotations': '/home/fdu02/fdu02_dir/lw/data/vary-600k/pdf_en_conv_30w_v2.json',
+    },
 }
 
 
