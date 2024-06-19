@@ -2,7 +2,7 @@
 
 # ProjectName
 
-LatentDoc: Resolving the document via Latent Space
+LatentDoc: Understanding the document via Latent Space
 
 
 
@@ -113,10 +113,3 @@ pip install -e .
 ## Infer
   The infer details can be found in LatentDoc/latentdoc/infer
 
-
-
-
-<<<<<<< HEAD
-=======
-
->>>>>>> ba4d948f01fe1761848f95fe36b9d1d5ca1fa141
