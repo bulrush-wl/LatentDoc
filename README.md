@@ -2,174 +2,116 @@
 
 # ProjectName
 
-ProjectName and Description
+LatentDoc: Resolving the document via Latent Space
 
-<!-- PROJECT SHIELDS -->
 
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
 
 <!-- PROJECT LOGO -->
 <br />
 
 <p align="center">
-  <a href="https://github.com/shaojintian/Best_README_template/">
+  <a href="https://github.com/bulrush-wl/LatentDoc">
     <img src="images/logo.png" alt="Logo" width="80" height="80">
   </a>
 
-  <h3 align="center">"完美的"README模板</h3>
+  <h3 align="center">LatentDoc</h3>
   <p align="center">
-    一个"完美的"README模板去快速开始你的项目！
-    <br />
-    <a href="https://github.com/shaojintian/Best_README_template"><strong>探索本项目的文档 »</strong></a>
-    <br />
-    <br />
-    <a href="https://github.com/shaojintian/Best_README_template">查看Demo</a>
-    ·
-    <a href="https://github.com/shaojintian/Best_README_template/issues">报告Bug</a>
-    ·
-    <a href="https://github.com/shaojintian/Best_README_template/issues">提出新特性</a>
+<!--     LatentDoc -->
+<!--     <br /> -->
+<!--     <a href="https://github.com/bulrush-wl/LatentDoc"><strong>探索本项目的文档 »</strong></a> -->
+<!--     <br /> -->
+<!--     <br /> -->
+    <a href="https://github.com/bulrush-wl/LatentDoc">Demo</a>
+<!--     · -->
+<!--     <a href="https://github.com/bulrush-wl/LatentDoc/issues">报告Bug</a> -->
+<!--     · -->
+<!--     <a href="https://github.com/bulrush-wl/LatentDoc">提出新特性</a> -->
   </p>
 
 </p>
 
 
- 本篇README.md面向开发者
  
-## 目录
+## Contents
 
-- [上手指南](#上手指南)
-  - [开发前的配置要求](#开发前的配置要求)
-  - [安装步骤](#安装步骤)
-- [文件目录说明](#文件目录说明)
-- [开发的架构](#开发的架构)
-- [部署](#部署)
-- [使用到的框架](#使用到的框架)
-- [贡献者](#贡献者)
-  - [如何参与开源项目](#如何参与开源项目)
-- [版本控制](#版本控制)
-- [作者](#作者)
-- [鸣谢](#鸣谢)
-
-### 上手指南
-
-请将所有链接中的“shaojintian/Best_README_template”改为“your_github_name/your_repository”
+- Install
+  - Base Environment
+  - Package Install
+- Download Pretrained Weight
+- Train
+- Infer
 
 
 
-###### 开发前的配置要求
-
-1. xxxxx x.x.x
-2. xxxxx x.x.x
-
-###### **安装步骤**
-
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
+## Install
+1. Base Environment
+```
+  Python 3.8
+  torch 2.0.1
+```
+2. Package Install
 
 ```sh
-git clone https://github.com/shaojintian/Best_README_template.git
-```
-
-### 文件目录说明
-eg:
-
-```
-filetree 
-├── ARCHITECTURE.md
-├── LICENSE.txt
-├── README.md
-├── /account/
-├── /bbs/
-├── /docs/
-│  ├── /rules/
-│  │  ├── backend.txt
-│  │  └── frontend.txt
-├── manage.py
-├── /oa/
-├── /static/
-├── /templates/
-├── useless.md
-└── /util/
-
+git clone https://github.com/bulrush-wl/LatentDoc.git
+cd LatentDoc
+pip install -r requirements.txt
+pip install -e .
 ```
 
 
+## Pretrained Weight
+- Download the sam_vit_b in [sam_vit_b](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth)
+- Download the OPT-125 in [Huggingface](https://huggingface.co/facebook/opt-125m)
+
+## Train
+1. Add the new dataset
+   - the DATASET_INFO config dict can be found in LatentDoc/latentdoc/data/simple_conversation_dataset.py
+   ```
+   DATASET_INFO = {
+        'dataset_name': {
+            'images': path/img_root/,
+            'annotations': path/annotation.json,
+        },
+    }
+   ```
+2. Run the training script
+   - there are some template scripts in the LatentDoc/scripts
+   ```sh
+   deepspeed   --include "localhost:0123"  \
+            --master_port 29501         \
+             path/LatentDoc/latentdoc/train/train_sam_opt_1024.py   \
+            --deepspeed path/LatentDoc/zero_config/zero0.json \
+            --model_name_or_path path/opt125                   \
+            --vision_encoder path/sam_vit_b_01ec64.pth \
+            --img_size 1024   \
+            --freeze_vision_encoder False    \
+            --freeze_lm_model False      \
+            --bf16 True                \
+            --per_device_eval_batch_size 16  \
+            --gradient_accumulation_steps 1     \
+            --evaluation_strategy "no"    \
+            --save_strategy "steps"    \
+            --save_steps 500    \
+            --save_total_limit 1   \
+            --weight_decay 0.    \
+            --warmup_ratio 0.03   \
+            --lr_scheduler_type 'cosine_with_restarts' \
+            --logging_steps 1 --tf32 True   \
+            --model_max_length 2048    \
+            --gradient_checkpointing True     \
+            --dataloader_num_workers 8      \
+            --report_to none       \
+            --per_device_train_batch_size 4  \
+            --num_train_epochs 2         \
+            --learning_rate 5e-5        \
+            --datasets  dataset1+dataset2    \
+            --output_dir path/output-dir    \
+   ```
+
+## Infer
+  The infer details can be found in LatentDoc/latentdoc/infer
 
 
 
-### 开发的架构 
-
-请阅读[ARCHITECTURE.md](https://github.com/shaojintian/Best_README_template/blob/master/ARCHITECTURE.md) 查阅为该项目的架构。
-
-### 部署
-
-暂无
-
-### 使用到的框架
-
-- [xxxxxxx](https://getbootstrap.com)
-- [xxxxxxx](https://jquery.com)
-- [xxxxxxx](https://laravel.com)
-
-### 贡献者
-
-请阅读**CONTRIBUTING.md** 查阅为该项目做出贡献的开发者。
-
-#### 如何参与开源项目
-
-贡献使开源社区成为一个学习、激励和创造的绝佳场所。你所作的任何贡献都是**非常感谢**的。
 
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-
-
-### 版本控制
-
-该项目使用Git进行版本管理。您可以在repository参看当前可用版本。
-
-### 作者
-
-xxx@xxxx
-
-知乎:xxxx  &ensp; qq:xxxxxx    
-
- *您也可以在贡献者名单中参看所有参与该项目的开发者。*
-
-### 版权说明
-
-该项目签署了MIT 授权许可，详情请参阅 [LICENSE.txt](https://github.com/shaojintian/Best_README_template/blob/master/LICENSE.txt)
-
-### 鸣谢
-
-
-- [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
-- [Img Shields](https://shields.io)
-- [Choose an Open Source License](https://choosealicense.com)
-- [GitHub Pages](https://pages.github.com)
-- [Animate.css](https://daneden.github.io/animate.css)
-- [xxxxxxxxxxxxxx](https://connoratherton.com/loaders)
-
-<!-- links -->
-[your-project-path]:shaojintian/Best_README_template
-[contributors-shield]: https://img.shields.io/github/contributors/shaojintian/Best_README_template.svg?style=flat-square
-[contributors-url]: https://github.com/shaojintian/Best_README_template/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/shaojintian/Best_README_template.svg?style=flat-square
-[forks-url]: https://github.com/shaojintian/Best_README_template/network/members
-[stars-shield]: https://img.shields.io/github/stars/shaojintian/Best_README_template.svg?style=flat-square
-[stars-url]: https://github.com/shaojintian/Best_README_template/stargazers
-[issues-shield]: https://img.shields.io/github/issues/shaojintian/Best_README_template.svg?style=flat-square
-[issues-url]: https://img.shields.io/github/issues/shaojintian/Best_README_template.svg
-[license-shield]: https://img.shields.io/github/license/shaojintian/Best_README_template.svg?style=flat-square
-[license-url]: https://github.com/shaojintian/Best_README_template/blob/master/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/shaojintian
