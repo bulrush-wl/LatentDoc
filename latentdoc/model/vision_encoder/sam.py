@@ -151,18 +151,22 @@ class ImageEncoderViT(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.patch_embed(x)
 
+        # print(x.shape)
         if self.pos_embed is not None:
             x = x + self.pos_embed
 
         for blk in self.blocks:
             x = blk(x)
             # print(x.shape)
-
+        # print(x.shape)
         x = self.neck(x.permute(0, 3, 1, 2))
 
+        # print(x.shape)
 
         x = self.net_2(x)
+        # print(x.shape)
         x = self.net_3(x)
+        # print(x.shape)
 
         # bchw -> blc
         x = x.flatten(2).permute(0, 2, 1)

@@ -37,6 +37,14 @@ DATASET_INFO = {
         'images': '/home/fdu02/fdu02_dir/lw/data/vary-600k/data/pdf_data/pdf_en_30w/',
         'annotations': '/home/fdu02/fdu02_dir/lw/data/vary-600k/pdf_en_conv_30w_v2.json',
     },
+        'DocVQA_train':{
+        'images': '/home/fdu02/fdu02_dir/lw/data/DocVQA/image/',
+        'annotations': '/home/fdu02/fdu02_dir/lw/data/DocVQA/train_conv.json',
+    },
+    'DocVQA_val':{
+         'images': '/home/fdu02/fdu02_dir/lw/data/DocVQA/image/',
+         'annotations': '/home/fdu02/fdu02_dir/lw/data/DocVQA/val_conv.json',
+    }
 }
 
 

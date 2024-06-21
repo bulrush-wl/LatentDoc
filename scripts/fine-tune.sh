@@ -1,9 +1,9 @@
 DS_SKIP_CUDA_CHECK=1   \
-deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500 /home/fdu02/fdu02_dir/lw/code/LatentDoc/latentdoc/train/train_sam_opt_1024.py   \
+deepspeed   --include "localhost:4,5,6,7" --master_port 29501 /home/fdu02/fdu02_dir/lw/code/LatentDoc/latentdoc/train/train_sam_opt_1024.py   \
             --deepspeed /home/fdu02/fdu02_dir/lw/code/LatentDoc/zero_config/zero0.json \
-            --model_name_or_path   /home/fdu02/fdu02_dir/lw/exp/test/复现vary-sam-opt-1024                       \
-            --vision_encoder    /home/fdu02/fdu02_dir/lw/pretrained_weight/sam_vit/sam_vit_b_01ec64.pth \
-            --img_size 1024    \
+            --model_name_or_path   /home/fdu02/fdu02_dir/lw/pretrained_weight/models--facebook--opt-125m                  \
+            --vision_encoder    /home/fdu02/fdu02_dir/lw/pretrained_weight/sam_vit/sam_vit_b_01ec64.pth\
+            --img_size 1024   \
             --freeze_vision_encoder False    \
             --freeze_lm_model False      \
             --bf16 True                \
@@ -11,7 +11,7 @@ deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500 /home/fdu02/fd
             --gradient_accumulation_steps 1     \
             --evaluation_strategy "no"    \
             --save_strategy "steps"    \
-            --save_steps 500    \
+            --save_steps 200    \
             --save_total_limit 10   \
             --weight_decay 0.05    \
             --warmup_ratio 0.03   \
@@ -21,8 +21,8 @@ deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500 /home/fdu02/fd
             --gradient_checkpointing True     \
             --dataloader_num_workers 12      \
             --report_to none       \
-            --per_device_train_batch_size 32   \
-            --num_train_epochs 10         \
+            --per_device_train_batch_size 16   \
+            --num_train_epochs 10        \
             --learning_rate 5e-5        \
             --datasets  DocVQA_train    \
-            --output_dir /home/fdu02/fdu02_dir/lw/exp/fine-tune_from_复现vary-sam-opt-1024    \
+            --output_dir /home/fdu02/fdu02_dir/lw/exp/fine-tune-_resume_scratch   \

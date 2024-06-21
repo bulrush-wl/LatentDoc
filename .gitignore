@@ -6,6 +6,8 @@ exps
 dist
 build
 .vscode
+*.vscode
+scripts_15
 .history
 __pycache__
 workdir
