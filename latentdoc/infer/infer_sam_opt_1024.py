@@ -16,6 +16,7 @@
 
 import os
 import argparse
+import tqdm
 # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from copy import deepcopy
 import logging
@@ -95,7 +96,7 @@ def infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg, dev
     output = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).strip()
     output = output.replace(mm_cfg.special_tokens.im_end_token, '')
     output = output.replace(tokenizer.eos_token, '')
-    print(output)
+    return output
     # print(output_ids)
 
 def infer_from_arg():
@@ -113,7 +114,33 @@ def infer_from_arg():
 
     infer_one_img(args.image_file, args.prompt, model, tokenizer, img_processor, mm_cfg)
     
+
+def infer_datasets():
     
+    # init the model
+    model_name_or_path = '/home/yuhaiyang/zlw/LatentDoc/exps/sam_deepspeed_cosine_with_restarts_self/checkpoint-2000'
+    model, tokenizer, img_processor, mm_cfg = init_model(model_name_or_path)
+    img_token = mm_cfg.special_tokens.img_token
+
+    # load the data
+    json_path = ''
+    img_root = ''
+    with open(json_path, 'r') as f:
+        eval_data = json.load(f)
+
+    new_data = copy.deepcopy(eval_data)
+    for i in tqdm.tqdm(range(len(eval_data))):
+        item = eval_data[i]
+        img_name = item['image']
+        img_path = os.path.join(img_root, img_name)
+        assert item['conversations'][0]['from'] == 'human'
+        prompt = item['conversations'][0]['value'].replace(img_token, '')
+        pred = infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg)  
+        new_data[i]['conversations'][1]['value'] = pred
+    
+    save_path = ''
+    with open(save_path, 'w') as f:
+        json.dump(new_data, f, ensure_ascii=False)
 
 if __name__ == "__main__":
     infer_from_arg()

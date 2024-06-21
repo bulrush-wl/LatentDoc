@@ -111,7 +111,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
     def _reload_vision_ckpt(self,):
 
-        if self.config.mm_cfg.vision_encoder is not None:
+        if self.config.mm_cfg.vision_encoder is not None and len(self.config.mm_cfg.vision_encoder) != 0:
             # with open(checkpoint, "rb") as f:
             checkpoint = self.config.mm_cfg.vision_encoder
             print(f'reloading vision encoder weight from {checkpoint}')

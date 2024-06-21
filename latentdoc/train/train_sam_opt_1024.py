@@ -24,7 +24,7 @@ import torch
 import transformers
 from easydict import EasyDict as edict
 
-
+from latentdoc.utils.constant import MM_CFG as mm_cfg
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
@@ -84,7 +84,7 @@ def train():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # build and init the mmcfg 
-    mm_cfg = build_mm_cfg()
+    # mm_cfg = build_mm_cfg()
     mm_cfg.model_max_length = training_args.model_max_length
     mm_cfg.vision_encoder = model_args.vision_encoder
     mm_cfg.img_size = model_args.img_size

@@ -8,44 +8,12 @@ import torch
 import transformers
 from typing import List, Optional, Tuple, Union, Dict, Sequence
 from torch.utils.data import Dataset
+from latentdoc.utils.constant import DATASET_INFO
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 IGNORE_INDEX = -100
-DATASET_INFO = {
-    'zhongtie_doc': {
-        'images': '/home/yuhaiyang/zlw/dataset/doc/val_imgs/',
-        'annotations': '/home/yuhaiyang/zlw/dataset/doc/doc_conv_val.json',
-    },
-    
-    'test': {
-        'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
-        'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test.json',
-    },
 
-    'test2': {
-        'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
-        'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test2.json',
-    },
-    
-    'pdf_cn_30k': {
-        'images': '/home/fdu02/fdu02_dir/lw/data/vary-600k/data/pdf_data/pdf_cn_30w/',
-        'annotations': '/home/fdu02/fdu02_dir/lw/data/vary-600k/pdf_cn_conv_30w_v2.json',
-    },
-
-    'pdf_en_30k': {
-        'images': '/home/fdu02/fdu02_dir/lw/data/vary-600k/data/pdf_data/pdf_en_30w/',
-        'annotations': '/home/fdu02/fdu02_dir/lw/data/vary-600k/pdf_en_conv_30w_v2.json',
-    },
-        'DocVQA_train':{
-        'images': '/home/fdu02/fdu02_dir/lw/data/DocVQA/image/',
-        'annotations': '/home/fdu02/fdu02_dir/lw/data/DocVQA/train_conv.json',
-    },
-    'DocVQA_val':{
-         'images': '/home/fdu02/fdu02_dir/lw/data/DocVQA/image/',
-         'annotations': '/home/fdu02/fdu02_dir/lw/data/DocVQA/val_conv.json',
-    }
-}
 
 
 class SimpleConversationDateset(Dataset):

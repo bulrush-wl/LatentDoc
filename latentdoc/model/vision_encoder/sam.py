@@ -456,7 +456,7 @@ class PatchEmbed(nn.Module):
 
 def build_sam_vit_b_1024(checkpoint=None):
     
-    checkpoint = WEIGHT_PATH['sam_vit_b']
+    # checkpoint = WEIGHT_PATH['sam_vit_b']
 
     return _build_sam(
         encoder_embed_dim=768,
