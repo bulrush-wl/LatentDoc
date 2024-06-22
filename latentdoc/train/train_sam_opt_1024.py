@@ -24,7 +24,7 @@ import torch
 import transformers
 from easydict import EasyDict as edict
 
-from latentdoc.utils.constant import MM_CFG as mm_cfg
+from latentdoc.utils.constant import MM_CFG
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
@@ -32,36 +32,36 @@ from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfi
 from latentdoc.model.vision_encoder.sam import build_train_transforms
 
 
-def build_mm_cfg():
-    DEFAULT_IMAGE_TOKEN = '<image>'
-    DEFAULT_IMAGE_PATCH_TOKEN = '<imgpad>'
-    DEFAULT_IMG_START_TOKEN = '<img>'
-    DEFAULT_IMG_END_TOKEN = '</img>'
-    DEFAULT_IM_START_TOKEN = '<|im_start|>'
-    DEFAULT_IM_END_TOKEN = '<|im_end|>' 
-    IGNORE_INDEX = -100
+# def build_mm_cfg():
+#     DEFAULT_IMAGE_TOKEN = '<image>'
+#     DEFAULT_IMAGE_PATCH_TOKEN = '<imgpad>'
+#     DEFAULT_IMG_START_TOKEN = '<img>'
+#     DEFAULT_IMG_END_TOKEN = '</img>'
+#     DEFAULT_IM_START_TOKEN = '<|im_start|>'
+#     DEFAULT_IM_END_TOKEN = '<|im_end|>' 
+#     IGNORE_INDEX = -100
 
-    special_tokens = {
-                'img_token': '<image>',
-                'img_patch_token': '<img_patch>',
-                'im_start_token': '<|im_start|>',
-                'im_end_token': '<|im_end|>' ,
-                'img_start_token': '<img>',
-                'img_end_token': '</img>',
-        }
+#     special_tokens = {
+#                 'img_token': '<image>',
+#                 'img_patch_token': '<img_patch>',
+#                 'im_start_token': '<|im_start|>',
+#                 'im_end_token': '<|im_end|>' ,
+#                 'img_start_token': '<img>',
+#                 'img_end_token': '</img>',
+#         }
 
-    mm_cfg = {
-            'img_token_len': 256,
-            'model_max_length': 2048,
-            'output_attentions': True,
-            'output_hidden_states': True,
-            'img_size': 1024,
-            'return_dict': True,
-            'special_tokens': special_tokens
-        }
+#     mm_cfg = {
+#             'img_token_len': 256,
+#             'model_max_length': 2048,
+#             'output_attentions': True,
+#             'output_hidden_states': True,
+#             'img_size': 1024,
+#             'return_dict': True,
+#             'special_tokens': special_tokens
+#         }
 
-    mm_cfg = edict(mm_cfg)
-    return mm_cfg
+#     mm_cfg = edict(mm_cfg)
+#     return mm_cfg
 
 def init_tokenizer(model_name_or_path, mm_cfg):
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
@@ -84,7 +84,7 @@ def train():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # build and init the mmcfg 
-    # mm_cfg = build_mm_cfg()
+    mm_cfg = deepcopy(MM_CFG)
     mm_cfg.model_max_length = training_args.model_max_length
     mm_cfg.vision_encoder = model_args.vision_encoder
     mm_cfg.img_size = model_args.img_size

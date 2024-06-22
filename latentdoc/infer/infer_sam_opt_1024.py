@@ -58,7 +58,6 @@ def init_model(model_name_or_path, device='cuda', dtype=torch.bfloat16):
     return model, tokenizer, img_processor, mm_cfg
    
 
-
 def infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg, device='cuda', dtype=torch.bfloat16):
 
     
@@ -114,33 +113,6 @@ def infer_from_arg():
 
     infer_one_img(args.image_file, args.prompt, model, tokenizer, img_processor, mm_cfg)
     
-
-def infer_datasets():
-    
-    # init the model
-    model_name_or_path = '/home/yuhaiyang/zlw/LatentDoc/exps/sam_deepspeed_cosine_with_restarts_self/checkpoint-2000'
-    model, tokenizer, img_processor, mm_cfg = init_model(model_name_or_path)
-    img_token = mm_cfg.special_tokens.img_token
-
-    # load the data
-    json_path = ''
-    img_root = ''
-    with open(json_path, 'r') as f:
-        eval_data = json.load(f)
-
-    new_data = copy.deepcopy(eval_data)
-    for i in tqdm.tqdm(range(len(eval_data))):
-        item = eval_data[i]
-        img_name = item['image']
-        img_path = os.path.join(img_root, img_name)
-        assert item['conversations'][0]['from'] == 'human'
-        prompt = item['conversations'][0]['value'].replace(img_token, '')
-        pred = infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg)  
-        new_data[i]['conversations'][1]['value'] = pred
-    
-    save_path = ''
-    with open(save_path, 'w') as f:
-        json.dump(new_data, f, ensure_ascii=False)
 
 if __name__ == "__main__":
     infer_from_arg()

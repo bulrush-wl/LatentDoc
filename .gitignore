@@ -3,6 +3,7 @@
 *.egg
 *.egg-info
 exps
+pretrained_weight
 dist
 build
 .vscode
