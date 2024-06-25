@@ -106,7 +106,7 @@ def infer_from_arg():
     parser.add_argument("--prompt", type=str, required=False )
     args = parser.parse_args()
 
-    args.model_weight_path = '/home/yuhaiyang/zlw/LatentDoc/exps/sam_deepspeed_cosine_with_restarts_self/checkpoint-2000'
+    args.model_weight_path = '/home/yuhaiyang/zlw/LatentDoc/exps/test'
     args.image_file = '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/sample_ch.png'
     args.prompt = 'Read all the text in the img.'
     model, tokenizer, img_processor, mm_cfg = init_model(args.model_weight_path)

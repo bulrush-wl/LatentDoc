@@ -7,6 +7,7 @@ import transformers
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
     vision_encoder: Optional[str] = field(default="")
+    ae: Optional[str] = field(default="")
     img_size: int = field(default=512)
     use_cache: bool = field(default=False)
     freeze_vision_encoder: bool = field(default=False)
