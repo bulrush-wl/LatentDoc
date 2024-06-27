@@ -12,6 +12,7 @@ class ModelArguments:
     use_cache: bool = field(default=False)
     freeze_vision_encoder: bool = field(default=False)
     freeze_lm_model: bool = field(default=False)
+    freeze_ae: bool = field(default=True)
    
 
 @dataclass

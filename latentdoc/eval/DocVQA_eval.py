@@ -55,6 +55,10 @@ def relaxed_correctness(target: str,
                               target_float) / abs(target_float)
         return relative_change <= max_relative_change
     else:
+        # if prediction.lower() in target.lower():
+        #     return True
+        # else:
+        #     return False
         return prediction.lower() == target.lower()
 
 def load_image(image_file):
@@ -103,7 +107,7 @@ def infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg, dev
         output_ids = model.multimodal_generate(
             input_ids=input_ids,
             images=images,
-            do_sample=True,
+            do_sample=False,
             num_beams = 1,
             streamer=streamer,
             max_new_tokens=4096,
@@ -138,7 +142,8 @@ def infer_datasets(model_name_or_path, json_path, img_root, save_path):
         prompt = item['conversations'][0]['value'].replace(img_token, '')
         pred = infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg)
         new_data[i]['conversations'][1]['value'] = pred
-    
+
+    print(f'The result of prediction is save in {save_path}')
     with open(save_path, 'w') as f:
         json.dump(new_data, f, ensure_ascii=False)
 
@@ -160,17 +165,24 @@ def calculate_metric(gt_json_path, pre_json_path):
                 total += 1
                 if relaxed_correctness(gt_conv['value'], pred_conv['value']):
                     correct += 1
+    pred_data.append({'acc': correct/total})
+
+    with open(pre_json_path, 'w') as f:
+        json.dump(pred_data, f, ensure_ascii=False)
+
+    return total, correct
     
-    print(f'total num: {total}, correct num: {correct}, acc: {correct/total}')
 
 def eval_DocVQA():
-    model_name_or_path = '/home/yuhaiyang/zlw/LatentDoc/exps/test'
-    json_path = '/home/yuhaiyang/zlw/dataset/zhongtie_doc/doc_conv_val.json'
-    img_root = '/home/yuhaiyang/zlw/dataset/doc/val_imgs'
-    save_path = '/home/yuhaiyang/zlw/dataset/zhongtie_doc/pred_test.json'
-
-    # infer_datasets(model_name_or_path, json_path, img_root, save_path)
-    calculate_metric(json_path, save_path)
+    model_name_or_path = '/home/fdu02/fdu02_dir/lw/exp/fine-tune-_resume_fromepoch10/checkpoint-6787'
+    json_path = '/home/fdu02/fdu02_dir/lw/data/DocVQA/val_conv.json'
+    img_root = '/home/fdu02/fdu02_dir/lw/data/DocVQA/image'
+    save_path = f'{model_name_or_path}/DocVQA_pred.json'
+    infer_datasets(model_name_or_path, json_path, img_root, save_path)
+    total, correct = calculate_metric(json_path, save_path)
+    print(f'model name: {model_name_or_path}')
+    print(f'result save path: {save_path}')
+    print(f'total num: {total}, correct num: {correct}, acc: {correct/total}')
 
 if __name__ == '__main__':
     eval_DocVQA()

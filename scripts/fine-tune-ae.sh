@@ -1,10 +1,11 @@
 DS_SKIP_CUDA_CHECK=1   \
-deepspeed   --include "localhost:4,5,6,7" --master_port 29501 /home/fdu02/fdu02_dir/lw/code/LatentDoc/latentdoc/train/train_sam_opt_1024.py   \
+deepspeed   --include "localhost:4,5,6,7" --master_port 29501 /home/fdu02/fdu02_dir/lw/code/LatentDoc/latentdoc/train/train_sam_opt_1024_with_ae.py   \
             --deepspeed /home/fdu02/fdu02_dir/lw/code/LatentDoc/zero_config/zero0.json \
             --model_name_or_path   /home/fdu02/fdu02_dir/lw/exp/fine-tune_resume_复现vary-sam-opt-1024-V2     \
             --img_size 1024   \
             --freeze_vision_encoder False    \
             --freeze_lm_model False      \
+            --freeze_ae False  \
             --bf16 True                \
             --per_device_eval_batch_size 16  \
             --gradient_accumulation_steps 1     \
