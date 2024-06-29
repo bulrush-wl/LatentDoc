@@ -513,7 +513,6 @@ def _build_sam(
 
 
 
-
 def alb_wrapper(transform):
     def f(im):
         return transform(image=np.asarray(im))["image"]

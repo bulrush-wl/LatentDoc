@@ -617,3 +617,5 @@ if __name__ == '__main__':
     data['labels'] = torch.tensor(torch.arange(1,2000), dtype=torch.long).unsqueeze(dim=0).cuda()
     res = model(**data)
     print(res.loss)
+
+
