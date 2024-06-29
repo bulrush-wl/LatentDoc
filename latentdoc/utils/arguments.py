@@ -9,6 +9,7 @@ class ModelArguments:
     vision_encoder: Optional[str] = field(default="")
     ae: Optional[str] = field(default="")
     img_size: int = field(default=512)
+    img_token_len: int = field(default=256)
     use_cache: bool = field(default=False)
     freeze_vision_encoder: bool = field(default=False)
     freeze_lm_model: bool = field(default=False)

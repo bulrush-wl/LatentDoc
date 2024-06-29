@@ -4,8 +4,11 @@ Copyright (c) Meta Platforms, Inc. and affiliates.
 This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 
-原始的vary在sam的vit后面使用两个卷积进行下采样,为和最终的img-token-len(16*16)对齐,删除一个卷积层，下采样倍率为2
+依然使用两个卷积进行下采样，每个卷积下采样倍率为4
+
 """
+
+
 
 import torch
 import torch.nn as nn
@@ -146,9 +149,9 @@ class ImageEncoderViT(nn.Module):
             LayerNorm2d(out_chans),
         )
 
-        self.net_2 = nn.Conv2d(256, 1024, kernel_size=3, stride=2, padding=1, bias=False)
-        # self.net_2 = nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1, bias=False)
-        # self.net_3 = nn.Conv2d(512, 1024, kernel_size=3, stride=2, padding=1, bias=False)
+        # self.net_2 = nn.Conv2d(256, 1024, kernel_size=3, stride=2, padding=1, bias=False)
+        self.net_2 = nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1, bias=False)
+        self.net_3 = nn.Conv2d(512, 1024, kernel_size=3, stride=2, padding=1, bias=False)
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -169,7 +172,7 @@ class ImageEncoderViT(nn.Module):
 
         x = self.net_2(x)
         # print(x.shape)
-        # x = self.net_3(x)
+        x = self.net_3(x)
         # print(x.shape)
 
         # bchw -> blc

@@ -28,7 +28,7 @@ from latentdoc.utils.constant import MM_CFG
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
-from latentdoc.model.sam_opt_1024_with_ae import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.sam_opt_1024_with_ae_down4 import LatentDocOPTForCausalLM, LatentDocConfig
 from latentdoc.model.AE.ae import build_train_transforms
 
 

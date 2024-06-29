@@ -88,6 +88,7 @@ def train():
     mm_cfg.model_max_length = training_args.model_max_length
     mm_cfg.vision_encoder = model_args.vision_encoder
     mm_cfg.img_size = model_args.img_size
+    mm_cfg.img_token_len = model_args.img_token_len
     
     # build and init the tokenizer
     tokenizer, mm_cfg = init_tokenizer(model_args.model_name_or_path, mm_cfg)
