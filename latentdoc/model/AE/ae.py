@@ -267,10 +267,10 @@ def model_init(pth_path, downsample_rate=32):
 
     model = UNet_ds32(n_channels=3, n_classes=3).cuda()
  
-    checkpoint={k.replace('module.', ''): v for k, v in                 
-                       torch.load(pth_path).items()}
+    # checkpoint={k.replace('module.', ''): v for k, v in                 
+    #                    torch.load(pth_path).items()}
 
-    model.load_state_dict(checkpoint, strict=True)
+    # model.load_state_dict(checkpoint, strict=True)
     return model
 
 def infer_single_img(model, img,  transform):
