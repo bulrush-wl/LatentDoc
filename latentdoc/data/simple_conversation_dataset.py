@@ -180,8 +180,8 @@ class SimpleConversationDateset(Dataset):
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         
-        i = 0
-        print(self.list_data_dict[i])
+        # i = 0
+        # print(self.list_data_dict[i])
         data = copy.deepcopy(self.list_data_dict[i])
 
         # process conversations
