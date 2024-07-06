@@ -14,6 +14,8 @@ from transformers import TextStreamer
 from latentdoc.utils.utils import disable_torch_init, KeywordsStoppingCriteria
 from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
 from latentdoc.model.vision_encoder.sam import build_test_transforms
+from latentdoc.eval.metric.anls import anls_score
+from latentdoc.eval.metric.acc import Is_correct
 
 
 def relaxed_correctness(target: str,
@@ -118,36 +120,36 @@ def infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg, dev
     output = output.replace(tokenizer.eos_token, '')
     return output
 
-def infer_datasets(model_name_or_path, json_path, img_root, save_path):
+def infer_dataset(model_name_or_path, eval_data, img_root):
     
     # init the model
-    # model_name_or_path = '/home/yuhaiyang/zlw/LatentDoc/exps/sam_deepspeed_cosine_with_restarts_self/checkpoint-2000'
     model, tokenizer, img_processor, mm_cfg = init_model(model_name_or_path)
     img_token = mm_cfg.special_tokens.img_token
 
-    # load the data
-    # json_path = ''
-    # img_root = ''
-    # save_path = ''
-
-    with open(json_path, 'r') as f:
-        eval_data = json.load(f)
-
-    new_data = copy.deepcopy(eval_data)
+    # infer
+    pred_res = []
     for i in tqdm.tqdm(range(len(eval_data))):
         item = eval_data[i]
         img_name = item['image']
         img_path = os.path.join(img_root, img_name)
         assert item['conversations'][0]['from'] == 'human'
+        assert item['conversations'][1]['from'] == 'gpt'
         prompt = item['conversations'][0]['value'].replace(img_token, '')
+
         pred = infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg)
-        new_data[i]['conversations'][1]['value'] = pred
 
-    print(f'The result of prediction is save in {save_path}')
-    with open(save_path, 'w') as f:
-        json.dump(new_data, f, ensure_ascii=False)
+        pred_res.append({
+            img_name: {
+                'question': item['conversations'][0]['value'],
+                'pred': pred,
+                'gt': item['conversations'][1]['value']
+            }
+        })
 
-def calculate_metric(gt_json_path, pre_json_path):
+    return pred_res
+
+
+def calculate_metric_v1(gt_json_path, pre_json_path):
     with open(gt_json_path, 'r') as f:
         gt_data = json.load(f)
 
@@ -171,18 +173,82 @@ def calculate_metric(gt_json_path, pre_json_path):
         json.dump(pred_data, f, ensure_ascii=False)
 
     return total, correct
-    
+
+
+def calculate_acc(pre_json_path, numeric_toleration=0.5, str_relaxed=False):
+
+    with open(pre_json_path, 'r') as f:
+        pred_data = json.load(f)
+
+    total = 0
+    correct = 0
+
+    for item in tqdm.tqdm(pred_data):
+        gt = item['gt']
+        pred = item['pred']
+        correct += Is_correct([gt], pred, numeric_toleration, str_relaxed)
+        total += 1
+
+    return total, correct 
+
+def calculate_anls(pre_json_path, threshold=0.5):
+    with open(pre_json_path, 'r') as f:
+        pred_data = json.load(f)
+
+    total = 0
+    correct = 0
+
+    for item in tqdm.tqdm(pred_data):
+        gt = item['gt']
+        pred = item['pred']
+        correct += anls_score(pred, [gt], threshold)
+        total += 1
+
+    return total, correct 
+
 
 def eval_DocVQA():
-    model_name_or_path = '/home/fdu02/fdu02_dir/lw/exp/fine-tune-_resume_fromepoch10/checkpoint-6787'
+    model_name_or_path = '/home/fdu02/fdu02_dir/lw/exp/fine-tune-_resume_fromepoch10'
     json_path = '/home/fdu02/fdu02_dir/lw/data/DocVQA/val_conv.json'
     img_root = '/home/fdu02/fdu02_dir/lw/data/DocVQA/image'
-    save_path = f'{model_name_or_path}/DocVQA_pred.json'
-    infer_datasets(model_name_or_path, json_path, img_root, save_path)
-    total, correct = calculate_metric(json_path, save_path)
-    print(f'model name: {model_name_or_path}')
-    print(f'result save path: {save_path}')
-    print(f'total num: {total}, correct num: {correct}, acc: {correct/total}')
+    save_name = 'DocVQA_pred.json'
+
+    # 获得当前目录下所有的ckpt
+    ckpt_names = [ dir_name for dir_name in os.listdir(model_name_or_path) if 'checkpoint-' in dir_name]
+    model_name_or_paths = [model_name_or_path]
+    model_name_or_paths += [ os.path.join(model_name_or_path, ckpt_name) for ckpt_name in ckpt_names]
+
+    # 读取数据集json文件
+    with open(json_path, 'r') as f:
+        eval_data = json.load(f)
+
+    # 对每个ckpt进行预测
+    for model_name_or_path in model_name_or_paths:
+
+        # 该ckpt已经预测过
+        if save_name in os.listdir(model_name_or_path):
+            continue
+
+        # infer
+        save_path = os.path.join(model_name_or_path, save_name)
+        infer_dataset(model_name_or_path, eval_data, img_root)
+
+        # 保存预测结果
+        with open(save_path, 'w') as f:
+            json.dump(pred_res, f, ensure_ascii=False)
+        print(f'The result of prediction is saved in {save_path}')
+    
+    # 计算评测指标
+    
+    
+    # save_path = f'{model_name_or_path}/DocVQA_pred.json'
+    # infer_datasets(model_name_or_path, json_path, img_root, save_path)
+    # total, correct = calculate_metric(json_path, save_path)
+    # print(f'model name: {model_name_or_path}')
+    # print(f'result save path: {save_path}')
+    # print(f'total num: {total}, correct num: {correct}, acc: {correct/total}')
+
+
 
 if __name__ == '__main__':
     eval_DocVQA()
