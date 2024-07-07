@@ -99,7 +99,7 @@ def train():
     # build and init the model
     model = LatentDocOPTForCausalLM.from_pretrained(model_args.model_name_or_path)
     model.train()
-    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
+    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg, resume=training_args.resume)
 
 
     dtype = torch.float32

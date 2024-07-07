@@ -151,9 +151,13 @@ class ImageEncoderViT(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.patch_embed(x)
 
-        # print(x.shape)
+        b, h, w, c = x.shape
         if self.pos_embed is not None:
-            x = x + self.pos_embed
+            x = x + self.pos_embed[:, :h, :w, :]
+
+        # print(x.shape)
+        # if self.pos_embed is not None:
+        #     x = x + self.pos_embed
 
         for blk in self.blocks:
             x = blk(x)
@@ -289,7 +293,7 @@ class Attention(nn.Module):
         attn = (q * self.scale) @ k.transpose(-2, -1)
 
         if self.use_rel_pos:
-            attn = add_decomposed_rel_pos(attn, q, self.rel_pos_h, self.rel_pos_w, (H, W), (H, W))
+            attn = add_decomposed_rel_pos(attn, q, self.rel_pos_h[:2*H-1, :], self.rel_pos_w[:2*W-1, :], (H, W), (H, W))
 
         attn = attn.softmax(dim=-1)
         x = (attn @ v).view(B, self.num_heads, H, W, -1).permute(0, 2, 3, 1, 4).reshape(B, H, W, -1)

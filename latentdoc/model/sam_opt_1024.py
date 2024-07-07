@@ -69,7 +69,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
         self.mm_projector = nn.Linear(1024, self.config.hidden_size)
 
-        self._init_mm_projector()
+
 
     def _init_mm_projector(self, ):
         std = self.config.init_std
@@ -77,19 +77,13 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         if self.mm_projector.bias is not None:
             self.mm_projector.bias.data.zero_()
 
-    def init_multimodal_module(self, tokenizer, mm_cfg=None):
+    def init_multimodal_module(self, tokenizer, mm_cfg=None, resume=False):
 
-        if self.training:
+        if self.training and not resume:
             print('*'*12 + 'initing multimodal module' + '*'*12)
-            # self.num_new_tokens = tokenizer.add_special_tokens({
-            # 'additional_special_tokens': list(mm_cfg.special_tokens.values())
-            # })
-
-            # mm_cfg.img_patch_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_patch_token)
-            # mm_cfg.im_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_start_token)
-            # mm_cfg.im_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_end_token)
-            # mm_cfg.img_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_start_token)
-            # mm_cfg.img_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_end_token)
+          
+            print('*'*6 + 'init the project' + '*'*6)
+            self._init_mm_projector()
 
             self.config.mm_cfg = mm_cfg
 
@@ -101,12 +95,17 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
             print('*'*6 + 'reloading the vision ckpy' + '*'*6)
             self._reload_vision_ckpt()
-        
-        else:
+
+        elif self.training and resume:
+
+            self.config.mm_cfg = mm_cfg
+
+        elif not self.training:
+
             mm_cfg = self.config.mm_cfg
             self.config.mm_cfg = edict(mm_cfg)
+   
           
-
         return tokenizer, mm_cfg
 
     def _reload_vision_ckpt(self,):
