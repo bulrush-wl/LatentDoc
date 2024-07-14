@@ -12,7 +12,9 @@ from easydict import EasyDict as edict
 import transformers
 from transformers import TextStreamer
 from latentdoc.utils.utils import disable_torch_init, KeywordsStoppingCriteria
-from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4 import LatentDocOPTForCausalLM, LatentDocConfig
+# from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
+
 from latentdoc.model.vision_encoder.sam import build_test_transforms
 from latentdoc.eval.metric.anls import anls_score
 from latentdoc.eval.metric.acc import Is_correct
@@ -112,7 +114,7 @@ def infer_one_img(img_path, prompt, model, tokenizer, img_processor, mm_cfg, dev
             do_sample=False,
             num_beams = 1,
             streamer=streamer,
-            max_new_tokens=4096,
+            max_new_tokens=1024,
             stopping_criteria=[stopping_criteria]
             )
     output = tokenizer.decode(output_ids[0, input_ids.shape[1]:]).strip()
@@ -183,11 +185,12 @@ def calculate_acc(pre_json_path, numeric_toleration=0.5, str_relaxed=False):
     total = 0
     correct = 0
 
-    for item in tqdm.tqdm(pred_data):
-        gt = item['gt']
-        pred = item['pred']
-        correct += Is_correct([gt], pred, numeric_toleration, str_relaxed)
-        total += 1
+    for conversation in tqdm.tqdm(pred_data):
+        for _,item in conversation.items():
+            gt = item['gt']
+            pred = item['pred']
+            correct += Is_correct([gt], pred, numeric_toleration, str_relaxed)
+            total += 1
 
     return total, correct 
 
@@ -198,23 +201,27 @@ def calculate_anls(pre_json_path, threshold=0.5):
     total = 0
     correct = 0
 
-    for item in tqdm.tqdm(pred_data):
-        gt = item['gt']
-        pred = item['pred']
-        correct += anls_score(pred, [gt], threshold)
-        total += 1
+
+    for conversation in tqdm.tqdm(pred_data):
+        for _,item in conversation.items():
+            gt = item['gt']
+            pred = item['pred']
+            correct += anls_score(pred, [gt], threshold)
+            total += 1
 
     return total, correct 
 
 
 def eval_DocVQA():
-    model_name_or_path = '/home/fdu02/fdu02_dir/lw/exp/fine-tune-_resume_fromepoch10'
-    json_path = '/home/fdu02/fdu02_dir/lw/data/DocVQA/val_conv.json'
+    model_name_or_path = r'/home/fdu02/fdu02_dir/zyl/exp/(7-7)input_1024_token_num_64_ae_aefrozen_finetune/'
+    json_path = '/home/fdu02/fdu02_dir/lw/data/DocVQA/train_conv.json'
     img_root = '/home/fdu02/fdu02_dir/lw/data/DocVQA/image'
-    save_name = 'DocVQA_pred.json'
+    save_name = 'DocVQA_pred_train.json'
 
     # 获得当前目录下所有的ckpt
-    ckpt_names = [ dir_name for dir_name in os.listdir(model_name_or_path) if 'checkpoint-' in dir_name]
+    # ckpt_names = [ dir_name for dir_name in os.listdir(model_name_or_path) if 'checkpoint-' in dir_name]
+    ckpt_names = ['checkpoint-1000']
+
     model_name_or_paths = [model_name_or_path]
     model_name_or_paths += [ os.path.join(model_name_or_path, ckpt_name) for ckpt_name in ckpt_names]
 
@@ -226,12 +233,12 @@ def eval_DocVQA():
     for model_name_or_path in model_name_or_paths:
 
         # 该ckpt已经预测过
-        if save_name in os.listdir(model_name_or_path):
-            continue
+        # if save_name in os.listdir(model_name_or_path):
+        #     continue
 
         # infer
         save_path = os.path.join(model_name_or_path, save_name)
-        infer_dataset(model_name_or_path, eval_data, img_root)
+        pred_res = infer_dataset(model_name_or_path, eval_data, img_root)
 
         # 保存预测结果
         with open(save_path, 'w') as f:
@@ -248,7 +255,34 @@ def eval_DocVQA():
     # print(f'result save path: {save_path}')
     # print(f'total num: {total}, correct num: {correct}, acc: {correct/total}')
 
+import os
+import fnmatch
 
+def find_test_json_files(root_path):
+    """
+    递归查找指定目录下所有名为"test.json"的文件，并返回它们的绝对路径列表。
+    
+    :param root_path: 查找的根目录
+    :return: 包含所有匹配文件绝对路径的列表
+    """
+    matches = []
+    
+    for root, dirnames, filenames in os.walk(root_path):
+        for filename in fnmatch.filter(filenames, 'DocVQA_pred.json'):
+            matches.append(os.path.join(root, filename))
+    
+    return matches
 
 if __name__ == '__main__':
-    eval_DocVQA()
+    # eval_DocVQA()
+    root_path='/home/fdu02/fdu02_dir/lw/exp/7.9-pretrain-imgsize-1024*1024-sam-opt-epoch5-bs10-ae-lr-5e-5-finetune'
+    json_paths=find_test_json_files(root_path)
+    for json_path in json_paths:
+        print()
+        print(json_path)
+        t,correct=calculate_acc(json_path,numeric_toleration=0,str_relaxed=True)
+        print('acc in\t',correct/t)
+        t,correct=calculate_acc(json_path,numeric_toleration=0,str_relaxed=False)
+        print('acc ==\t',correct/t)
+        t,correct=calculate_anls(json_path)
+        print('anls\t',correct/t)

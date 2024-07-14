@@ -16,7 +16,7 @@ deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29501 /home/fdu02/fd
             --save_steps 50    \
             --save_total_limit 10   \
             --weight_decay 0.05    \
-            --warmup_ratio 0.03   \
+            --warmup_ratio 0.03*5   \
             --lr_scheduler_type 'cosine_with_restarts' \
             --logging_steps 1 --tf32 True   \
             --model_max_length 2048    \

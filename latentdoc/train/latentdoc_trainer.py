@@ -145,7 +145,8 @@ class LatentDocTrainer(Trainer):
         if self.lr_scheduler is None:
             # self.args.lr_scheduler_kwargs = {'num_cycles': self.args.num_cycles}
             if self.args.lr_scheduler_type == 'cosine_with_restarts':
-                warmup_steps = int(self.args.warmup_ratio * num_training_steps)
+                warmup_steps = int(self.args.warmup_ratio * num_training_steps/ self.args.num_train_epochs)
+                # warmup_steps = int(self.args.warmup_ratio * num_training_steps)
                 restart_steps = int(num_training_steps / self.args.num_train_epochs)
                 self.lr_scheduler = WarmupCosineRestartLR(self.optimizer, warmup_steps, num_training_steps, restart_steps)
 
