@@ -48,15 +48,13 @@ LatentDoc: Understanding the document via Latent Space
 ```
   Python 3.8
   torch 2.0.1
+  reference: https://github.com/Ucas-HaoranWei/Vary/tree/main
 ```
 We suggest that you use the conda environment to install Python and torch in advance.
 
 2. Package Install
-- Note: if you have installed Python and torch already, you need to ignore the torch, torchaudio, torchvision in the requirement.txt, manually. Otherwise, the torch, torchaudio, torchvision will be reinstalled again.
 
 ```sh
-reference: https://github.com/Ucas-HaoranWei/Vary/tree/main
-
 git clone https://github.com/bulrush-wl/LatentDoc.git
 cd LatentDoc
 pip install -e .
