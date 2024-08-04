@@ -130,6 +130,13 @@ class SimpleConversationDateset(Dataset):
 
         # mask targets
         total_len = int(targets.ne(self.tokenizer.pad_token_id).sum())
+
+        # 防止bos，eos和pad三者一样
+        if self.tokenizer.pad_token_id == self.tokenizer.bos_token_id:
+            total_len += 1
+        if self.tokenizer.pad_token_id == self.tokenizer.eos_token_id:
+            total_len += 1
+
         sep = self.im_end_token+self.im_start_token+'gpt:'
         cur_len = 0
         for i, rou in enumerate(rounds):

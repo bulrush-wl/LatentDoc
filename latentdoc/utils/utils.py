@@ -6,8 +6,9 @@ import sys
 import torch
 import requests
 
+import transformers
 from transformers import StoppingCriteria
-# from vary.utils.constants import LOGDIR
+
 
 server_error_msg = "**NETWORK ERROR DUE TO HIGH TRAFFIC. PLEASE REGENERATE OR REFRESH THIS PAGE.**"
 moderation_msg = "YOUR INPUT VIOLATES OUR CONTENT MODERATION GUIDELINES. PLEASE TRY AGAIN."
@@ -175,19 +176,27 @@ def smart_tokenizer_and_embedding_resize(special_tokens_dict, tokenizer, model):
         input_embeddings[-num_new_tokens:] = input_embeddings_avg
         output_embeddings[-num_new_tokens:] = output_embeddings_avg
 
-    
-def maybe_zero_3(param, ignore_status=False, name=None):
-    from deepspeed import zero
-    from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
+def maybe_zero_3(param):
     if hasattr(param, "ds_id"):
-        if param.ds_status == ZeroParamStatus.NOT_AVAILABLE:
-            if not ignore_status:
-                logging.warning(f"{name}: param.ds_status != ZeroParamStatus.NOT_AVAILABLE: {param.ds_status}")
+        assert param.ds_status == ZeroParamStatus.NOT_AVAILABLE
         with zero.GatheredParameters([param]):
             param = param.data.detach().cpu().clone()
     else:
         param = param.detach().cpu().clone()
     return param
+    
+# def maybe_zero_3(param, ignore_status=False, name=None):
+#     from deepspeed import zero
+#     from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
+#     if hasattr(param, "ds_id"):
+#         if param.ds_status == ZeroParamStatus.NOT_AVAILABLE:
+#             if not ignore_status:
+#                 logging.warning(f"{name}: param.ds_status != ZeroParamStatus.NOT_AVAILABLE: {param.ds_status}")
+#         with zero.GatheredParameters([param]):
+#             param = param.data.detach().cpu().clone()
+#     else:
+#         param = param.detach().cpu().clone()
+#     return param
 
 
 # Borrowed from peft.utils.get_peft_model_state_dict
@@ -233,3 +242,29 @@ def find_all_linear_names(model):
 
     print(lora_module_names)
     return list(lora_module_names)
+
+def safe_save_model_for_hf_trainer(
+    trainer: transformers.Trainer, output_dir: str, bias="none"
+):
+    """Collects the state dict and dump to disk."""
+    # check if zero3 mode enabled
+    if deepspeed.is_deepspeed_zero3_enabled():
+        state_dict = trainer.model_wrapped._zero3_consolidated_16bit_state_dict()
+    else:
+        if trainer.args.use_lora:
+            state_dict = get_peft_state_maybe_zero_3(
+                trainer.model.named_parameters(), bias
+            )
+        else:
+            state_dict = trainer.model.state_dict()
+    if trainer.args.should_save and trainer.args.local_rank == 0:
+        trainer._save(output_dir, state_dict=state_dict)
+
+
+from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
+from dataclasses import dataclass
+@dataclass
+class CausalLMOutputWithPast_ae(CausalLMOutputWithPast):
+    ae_loss: torch.FloatTensor = None
+    l2_loss: torch.FloatTensor = None
+    gpp_loss: torch.FloatTensor = None

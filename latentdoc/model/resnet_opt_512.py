@@ -157,9 +157,9 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         else:
             num_new_tokens = len(tokenizer) - raw_llm_vocab
 
-            self.llm.resize_token_embeddings(len(tokenizer))  # do not know
+            self.resize_token_embeddings(len(tokenizer))  
 
-            # resize_token_embeddings will do the following things, too
+            # init the new embedding
             input_embeddings = self.get_input_embeddings().weight.data
             output_embeddings = self.get_output_embeddings().weight.data
 

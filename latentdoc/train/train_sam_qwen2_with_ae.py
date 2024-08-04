@@ -15,7 +15,7 @@
 #    limitations under the License.
 
 import os
-
+import importlib
 # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from copy import deepcopy
 import logging
@@ -28,10 +28,20 @@ from latentdoc.utils.constant import MM_CFG
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
-from latentdoc.model.sam_opt_1024_with_ae import LatentDocOPTForCausalLM, LatentDocConfig
-from latentdoc.model.AE.ae import build_train_transforms
 
 
+
+# def customer_import(model_type):
+#     global LatentDocQwen2ForCausalLM, LatentDocConfig, build_train_transforms
+
+#     if model_type == 'sam_qwen2_with_ae':
+#         from latentdoc.model.sam_qwen2_with_ae import LatentDocQwen2ForCausalLM, LatentDocConfig
+#         from latentdoc.model.AE.ae import build_train_transforms
+
+#     else:
+
+#         print(f'There is no {model_type}')
+#         exit()
 
 def init_tokenizer(model_name_or_path, mm_cfg):
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
@@ -47,12 +57,9 @@ def init_tokenizer(model_name_or_path, mm_cfg):
 
     return tokenizer, mm_cfg
 
-def train():
-    
-    # parse the argument 
-    parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+def train(model_args, data_args, training_args):
+    
     # build and init the mmcfg 
     mm_cfg = deepcopy(MM_CFG)
     mm_cfg.model_max_length = training_args.model_max_length
@@ -68,7 +75,7 @@ def train():
     img_processor = build_train_transforms(img_size=mm_cfg.img_size)
 
     # build and init the model
-    model = LatentDocOPTForCausalLM.from_pretrained(model_args.model_name_or_path)
+    model = LatentDocQwen2ForCausalLM.from_pretrained(model_args.model_name_or_path)
     model.train()
     tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
 
@@ -81,22 +88,37 @@ def train():
 
     model.to(dtype=dtype, device=training_args.device)
 
+    # freeze LLM
     if model_args.freeze_lm_model:
         model.model.requires_grad_(False)
         for p in model.model.get_input_embeddings().parameters():
             p.requires_grad = True
-    
+        print(f'The parameters of the LLM model will not be updated, while the input embedding layer will be updated.')
+    else:
+        print(f'The parameters of the LLM model will be updated')
+
+    # freeze vision encoder
     if model_args.freeze_vision_encoder:
         model.vision_encoder.requires_grad_(False)
+        print(f'The parameters of the vision encoder will not be updated.')
+    else:
+        print(f'The parameters of the vision encoder will be updated')
 
     # freeze the ae_model
     if model_args.freeze_ae:
-        model.ae_model.requires_grad_(False)
+        try:
+            model.ae_model.requires_grad_(False)
+            print(f'The parameters of the AE module will not be updated.')
+        except:
+            print(f'There is no ae model, freeze_ae will not perform.')
+            exit()
+    else:
+        print(f'The parameters of the AE module will be updated')
 
     params_grad = [p.numel() for n, p in model.named_parameters() if p.requires_grad]
     print(f"Number of Mapping Trainable Parameters: {sum(params_grad) / (1 << 20):.2f} M")
 
-  
+
     data_module = make_supervised_data_module(
         data_args=data_args,
         tokenizer=tokenizer, 
@@ -117,10 +139,32 @@ def train():
         trainer.train(resume_from_checkpoint=True)
     else:
         trainer.train()
-        
+
     trainer.save_state()
     trainer._safe_save(output_dir=training_args.output_dir)
 
 
+def args_parse():
+    
+    parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    return model_args, data_args, training_args
+
+
 if __name__ == "__main__":
-    train()
+
+    # parse the argument 
+    model_args, data_args, training_args = args_parse()
+
+    # perform customer import
+    if model_args.model_type == 'sam_qwen2_with_ae':
+        from latentdoc.model.sam_qwen2_with_ae import LatentDocQwen2ForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_train_transforms
+    else:
+        print(f'There is no {model_args.model_type}')
+        exit()
+
+    # train
+    train(model_args, data_args, training_args)
+

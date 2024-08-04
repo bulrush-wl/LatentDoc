@@ -6,7 +6,7 @@ from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from easydict import EasyDict as edict
 from latentdoc.model.llm.opt import build_opt_causal_lm
-from latentdoc.model.vision_encoder.sam_without_patch_embedding import build_sam_vit_b_1024  # without patch embedding
+from latentdoc.model.vision_encoder.sam_without_patch_embedding_down2 import build_sam_vit_b_1024  # without patch embedding
 from latentdoc.model.AE.ae import build_ae_model
 
 
@@ -81,19 +81,13 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         if self.mm_projector.bias is not None:
             self.mm_projector.bias.data.zero_()
 
-    def init_multimodal_module(self, tokenizer, mm_cfg=None):
+    def init_multimodal_module(self, tokenizer, mm_cfg=None, resume=None):
 
-        if self.training:
+        if self.training and not resume:
             print('*'*12 + 'initing multimodal module' + '*'*12)
-            # self.num_new_tokens = tokenizer.add_special_tokens({
-            # 'additional_special_tokens': list(mm_cfg.special_tokens.values())
-            # })
-
-            # mm_cfg.img_patch_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_patch_token)
-            # mm_cfg.im_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_start_token)
-            # mm_cfg.im_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_end_token)
-            # mm_cfg.img_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_start_token)
-            # mm_cfg.img_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_end_token)
+          
+            print('*'*6 + 'init the project' + '*'*6)
+            self._init_mm_projector()
 
             self.config.mm_cfg = mm_cfg
 
@@ -105,13 +99,16 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
             print('*'*6 + 'reloading the vision ckpy' + '*'*6)
             self._reload_vision_ckpt()
-        
-        else:
+
+        elif self.training and resume:
+            self.config.mm_cfg = mm_cfg
+
+        elif not self.training:
             mm_cfg = self.config.mm_cfg
             self.config.mm_cfg = edict(mm_cfg)
           
-
         return tokenizer, mm_cfg
+
 
     def _reload_vision_ckpt(self,):
 
@@ -179,9 +176,9 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         else:
             num_new_tokens = len(tokenizer) - raw_llm_vocab
 
-            self.llm.resize_token_embeddings(len(tokenizer))  # do not know
+            self.resize_token_embeddings(len(tokenizer))  
 
-            # resize_token_embeddings will do the following things, too
+            # init the new embedding
             input_embeddings = self.get_input_embeddings().weight.data
             output_embeddings = self.get_output_embeddings().weight.data
 
@@ -201,7 +198,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
     def embed_images(self, images):
 
         # add ae encoder
-        self.ae_model.eval()
+        # self.ae_model.eval()
         images = self.ae_model.inc(images)
         images = self.ae_model.encoder(images)
      

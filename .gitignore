@@ -2,6 +2,7 @@
 *.so
 *.egg
 *.egg-info
+exp
 exps
 pretrained_weight
 dist
@@ -14,3 +15,6 @@ __pycache__
 workdir
 *.pth
 *.pt
+*.png
+*.jpg
+*.JPG

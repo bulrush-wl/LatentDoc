@@ -50,6 +50,16 @@ DATASET_INFO = {
         'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test.json',
     },
 
+    'test_en': {
+        'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
+        'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test_en.json',
+    },
+
+    'test_cn': {
+        'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
+        'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test_cn.json',
+    },
+
     'test2': {
         'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
         'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test2.json',
@@ -64,10 +74,12 @@ DATASET_INFO = {
         'images': '/home/fdu02/fdu02_dir/lw/data/vary-600k/data/pdf_data/pdf_en_30w/',
         'annotations': '/home/fdu02/fdu02_dir/lw/data/vary-600k/pdf_en_conv_30w_v2.json',
     },
-        'DocVQA_train':{
+
+    'DocVQA_train':{
         'images': '/home/fdu02/fdu02_dir/lw/data/DocVQA/image/',
         'annotations': '/home/fdu02/fdu02_dir/lw/data/DocVQA/train_conv.json',
     },
+    
     'DocVQA_val':{
          'images': '/home/fdu02/fdu02_dir/lw/data/DocVQA/image/',
          'annotations': '/home/fdu02/fdu02_dir/lw/data/DocVQA/val_conv.json',

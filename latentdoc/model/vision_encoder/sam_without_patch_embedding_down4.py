@@ -4,7 +4,7 @@ Copyright (c) Meta Platforms, Inc. and affiliates.
 This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 
-依然使用两个卷积进行下采样，每个卷积下采样倍率为4
+只将Vit的Patch embedding去掉，其他和Vary中的sam Vit完全一致
 
 """
 
@@ -149,7 +149,6 @@ class ImageEncoderViT(nn.Module):
             LayerNorm2d(out_chans),
         )
 
-        # self.net_2 = nn.Conv2d(256, 1024, kernel_size=3, stride=2, padding=1, bias=False)
         self.net_2 = nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1, bias=False)
         self.net_3 = nn.Conv2d(512, 1024, kernel_size=3, stride=2, padding=1, bias=False)
 
@@ -514,8 +513,6 @@ def _build_sam(
         # image_encoder.load_state_dict({k[19:]: v for k, v in state_dict.items() if 'vision_tower' in k}, strict=True)
         
     return image_encoder
-
-
 
 
 def alb_wrapper(transform):

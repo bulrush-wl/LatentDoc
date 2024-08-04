@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from easydict import EasyDict as edict
+from latentdoc.model.AE.loss import GradientPriorLoss
 from latentdoc.model.llm.opt import build_opt_causal_lm
 from latentdoc.model.vision_encoder.sam_without_patch_embedding_down4 import build_sam_vit_b_1024  # without patch embedding
 from latentdoc.model.AE.ae import build_ae_model
@@ -13,6 +14,8 @@ from latentdoc.model.AE.ae import build_ae_model
 from transformers import OPTConfig, OPTModel, OPTForCausalLM
 import logging
 from torchvision import transforms
+
+from latentdoc.utils.utils import CausalLMOutputWithPast_ae
 
 def interpolate_positional_encoding(pe, target_length):
     """
@@ -214,7 +217,8 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         # self.ae_model.eval()
         images = self.ae_model.inc(images)
         images = self.ae_model.encoder(images)
-     
+        recon=self.ae_model.decoder(images)
+        recon=self.ae_model.outc(recon)
         images = images.permute(0, 2, 3, 1)
 
         images = self.ae_projector(images)
@@ -226,7 +230,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
         img_features = self.mm_projector(img_features)
 
-        return img_features
+        return img_features,recon
 
     def multimodal_process(self, input_ids, input_embeddings, img_features):
 
@@ -297,26 +301,35 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, CausalLMOutputWithPast]:
+    ) -> Union[Tuple, CausalLMOutputWithPast_ae]:
         
         # print(self.ae_model.inc.double_conv[0].weight[0,0])
-        
+        if images!=None:
+            raw_images=images.clone()
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.return_dict
 
-
+        # print(inputs_embeds)
+        # if images is not None:
+        # print(images)
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-
+        # print(inputs_embeds.shape)
+        # print(input_ids.shape)
         if self.training and images is not None:
-            img_features = self.embed_images(images)
+            img_features,recon = self.embed_images(images)
             
             inputs_embeds = self.multimodal_process(input_ids, inputs_embeds, img_features)
-
+        # elif images is None and inputs_embeds is not None:
+        #     multimodal_input_embeddings = inputs_embeds
+        # else:
+        #     print(111)
+        # else:
+        #     raise
         
         outputs = self.model.decoder(
             input_ids=None,
@@ -337,27 +350,46 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         if labels is not None:
             # move labels to correct device to enable model parallelism
             labels = labels.to(logits.device)
+            
             # Shift so that tokens < n predict n
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
+            criterion = nn.MSELoss()
+            GPP_criterion=GradientPriorLoss()
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(shift_logits.view(-1, self.config.vocab_size), shift_labels.view(-1))
+            ae_loss = loss_fct(shift_logits.view(-1, self.config.vocab_size), shift_labels.view(-1))
+            # print('celoss=',loss)
+            l2_loss=criterion(recon,raw_images)
+            # print('l2loss=',l2_loss)
+            gpp_loss=GPP_criterion(recon,raw_images)*1e-2
+            # print('gpploss=',gpp_loss)
+            loss=ae_loss+(l2_loss+gpp_loss)*10
 
         
 
         if not return_dict:
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
-
-        return CausalLMOutputWithPast(
-            loss=loss,
-            logits=logits,
-            past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
-
+        if images!=None:
+            return CausalLMOutputWithPast_ae(
+                loss=loss,
+                logits=logits,
+                past_key_values=outputs.past_key_values,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions,
+                ae_loss=ae_loss,
+                l2_loss=l2_loss,
+                gpp_loss=gpp_loss
+            )
+        else:
+            return CausalLMOutputWithPast(
+                loss=loss,
+                logits=logits,
+                past_key_values=outputs.past_key_values,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions,
+            )
     def prepare_inputs_for_generation(
         self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs
     ):
@@ -385,7 +417,15 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             
         else:
             model_inputs = {"input_ids": input_ids}
-  
+        # if past_key_values is not None:
+        #     print(len(past_key_values))
+        #     print(len(past_key_values[0]))
+        #     print(len(past_key_values[0][0]))
+        #     print(len(past_key_values[0][0][0]))
+        #     print(len(past_key_values[0][0][0][0]))
+        #     print(inputs_embeds.shape)
+        #     print(input_ids.shape)
+        # print(model_inputs.keys())
         model_inputs.update(
             {
                 "past_key_values": past_key_values,
@@ -402,10 +442,12 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         self, input_ids, images, inputs_embeds=None, **kwargs
     ):
 
-        img_features = self.embed_images(images)
-
+        img_features,_ = self.embed_images(images)
+        # print(img_features.shape)
         input_embeddings = self.embed_tokens(input_ids)
         multimodal_input_embeddings = self.multimodal_process(input_ids, input_embeddings, img_features)
+        # print(input_embeddings.shape)
+        # print(multimodal_input_embeddings.shape)
 
         return self.generate(input_ids=input_ids, inputs_embeds=multimodal_input_embeddings, **kwargs)
 

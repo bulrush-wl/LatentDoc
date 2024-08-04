@@ -16,30 +16,17 @@ from latentdoc.utils.utils import disable_torch_init, KeywordsStoppingCriteria
 from latentdoc.eval.metric.anls import anls_score
 from latentdoc.eval.metric.acc import Is_correct
 
-
-
 def customer_import(model_type):
-    global LatentDocOPTForCausalLM, LatentDocConfig, build_test_transforms
-    
-    if model_type == 'sam_opt_1024':
-        from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
+    global LatentDocQwen2ForCausalLM, LatentDocConfig, build_test_transforms
+    if model_type == 'sam_qwen2':
+        from latentdoc.model.sam_qwen2 import LatentDocQwen2ForCausalLM, LatentDocConfig
         from latentdoc.model.vision_encoder.sam import build_test_transforms
 
-    elif model_type == 'sam_opt_1024_with_ae':
-        from latentdoc.model.sam_opt_1024_with_ae import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_test_transforms
+    else:
+        print(f'There is no {model_type}')
+        exit() 
 
-    elif model_type == 'sam_opt_1024_with_ae_down4':
-        from latentdoc.model.sam_opt_1024_with_ae_down4 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_test_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae_with_projector_down2':
-        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down2 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_test_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae_with_projector_down4_recon':
-        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_test_transforms
+    
 
 def relaxed_correctness(target: str,
                         prediction: str,
@@ -95,7 +82,7 @@ def load_image(image_file):
     return image
 
 def init_model(model_name_or_path, device='cuda', dtype=torch.bfloat16):
-    model = LatentDocOPTForCausalLM.from_pretrained(model_name_or_path)
+    model = LatentDocQwen2ForCausalLM.from_pretrained(model_name_or_path)
     model.eval()
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False)
@@ -262,20 +249,28 @@ def eval_DocVQA():
         with open(save_path, 'w') as f:
             json.dump(pred_res, f, ensure_ascii=False)
         print(f'The result of prediction is saved in {save_path}')
- 
-
+    
+    # 计算评测指标
+    
+    
+    # save_path = f'{model_name_or_path}/DocVQA_pred.json'
+    # infer_datasets(model_name_or_path, json_path, img_root, save_path)
+    # total, correct = calculate_metric(json_path, save_path)
+    # print(f'model name: {model_name_or_path}')
+    # print(f'result save path: {save_path}')
+    # print(f'total num: {total}, correct num: {correct}, acc: {correct/total}')
 
 
 if __name__ == '__main__':
 
     # preform customer import
-    model_type = 'sam_opt_1024_with_ae_with_projector_down4_recon'
+    model_type = 'sam_qwen2'
     customer_import(model_type)
 
     # eval and save the pred
-    model_name_or_path = 'exps/recon_test_without_ae_pretrain/checkpoint-200'
-    eval_json_path = '/home/yuhaiyang/zlw/dataset/Vary-600k/test_ch.json'
-    img_root = '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs_2/'
+    model_name_or_path = '/home/yuhaiyang/zlw/LatentDoc/exps/test_en/checkpoint-50'
+    eval_json_path = '/home/yuhaiyang/zlw/dataset/Vary-600k/test.json'
+    img_root = '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/'
     temp_res_save_path = os.path.join(model_name_or_path, 'eval_res.json')
 
     with open(eval_json_path) as f:
@@ -285,7 +280,8 @@ if __name__ == '__main__':
     # save the pred res
     with open(temp_res_save_path, 'w') as f:
         json.dump(pred_res, f, ensure_ascii=False)
- 
+
+
     # calculate the metric
     total, correct=calculate_acc(temp_res_save_path, numeric_toleration=0, str_relaxed=True)
     print('acc in\t', correct/total)
@@ -293,3 +289,5 @@ if __name__ == '__main__':
     print('acc ==\t', correct/total)
     total, correct=calculate_anls(temp_res_save_path)
     print('anls\t', correct/total)
+
+    

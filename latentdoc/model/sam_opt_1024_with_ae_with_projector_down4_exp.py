@@ -207,14 +207,24 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
     def embed_tokens(self, input_ids):
 
         return self.get_input_embeddings()(input_ids)
+    
+    def get_ae_without_last_bn(self,ae_encoder):
+        ae_encoder_layers=ae_encoder[:-1]
+        ae_encoder_last_layer=ae_encoder[-1]
+        ae_encoder_last_layer_residual_function=ae_encoder_last_layer.downsample_conv.residual_function[:-1]
+        ae_encoder_last_layer_residual_function_bn=ae_encoder_last_layer.downsample_conv.residual_function[-1]
+        ae_encoder_last_layer_shortcut=ae_encoder_last_layer.downsample_conv.shortcut[:-1]
+        ae_encoder_last_layer_shortcut_bn=ae_encoder_last_layer.downsample_conv.shortcut[-1]
+        return ae_encoder_layers,ae_encoder_last_layer_residual_function,ae_encoder_last_layer_shortcut,ae_encoder_last_layer_residual_function_bn,ae_encoder_last_layer_shortcut_bn
 
     def embed_images(self, images):
 
         # add ae encoder
         # self.ae_model.eval()
+        # encoder_without_lastbn,ae_encoder_last_layer_residual_function,ae_encoder_last_layer_shortcut,last_layer_residual_function_bn,last_layer_shortcut_bn=self.get_ae_without_last_bn(self.ae_encoder)
         images = self.ae_model.inc(images)
         images = self.ae_model.encoder(images)
-     
+        images = torch.exp(images)
         images = images.permute(0, 2, 3, 1)
 
         images = self.ae_projector(images)
@@ -307,16 +317,24 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         )
         return_dict = return_dict if return_dict is not None else self.config.return_dict
 
-
+        # print(inputs_embeds)
+        # if images is not None:
+        # print(images)
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-
+        # print(inputs_embeds.shape)
+        # print(input_ids.shape)
         if self.training and images is not None:
             img_features = self.embed_images(images)
             
             inputs_embeds = self.multimodal_process(input_ids, inputs_embeds, img_features)
-
+        # elif images is None and inputs_embeds is not None:
+        #     multimodal_input_embeddings = inputs_embeds
+        # else:
+        #     print(111)
+        # else:
+        #     raise
         
         outputs = self.model.decoder(
             input_ids=None,
@@ -385,7 +403,15 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             
         else:
             model_inputs = {"input_ids": input_ids}
-  
+        # if past_key_values is not None:
+        #     print(len(past_key_values))
+        #     print(len(past_key_values[0]))
+        #     print(len(past_key_values[0][0]))
+        #     print(len(past_key_values[0][0][0]))
+        #     print(len(past_key_values[0][0][0][0]))
+        #     print(inputs_embeds.shape)
+        #     print(input_ids.shape)
+        # print(model_inputs.keys())
         model_inputs.update(
             {
                 "past_key_values": past_key_values,
@@ -403,9 +429,11 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
     ):
 
         img_features = self.embed_images(images)
-
+        # print(img_features.shape)
         input_embeddings = self.embed_tokens(input_ids)
         multimodal_input_embeddings = self.multimodal_process(input_ids, input_embeddings, img_features)
+        # print(input_embeddings.shape)
+        # print(multimodal_input_embeddings.shape)
 
         return self.generate(input_ids=input_ids, inputs_embeds=multimodal_input_embeddings, **kwargs)
 

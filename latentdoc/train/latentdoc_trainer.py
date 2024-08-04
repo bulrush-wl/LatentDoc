@@ -46,6 +46,7 @@ def unwrap_model(model: nn.Module) -> nn.Module:
     else:
         return model
 
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 class LatentDocTrainer(Trainer):
 

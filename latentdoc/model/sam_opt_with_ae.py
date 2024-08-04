@@ -6,7 +6,7 @@ from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from easydict import EasyDict as edict
 from latentdoc.model.llm.opt import build_opt_causal_lm
-from latentdoc.model.vision_encoder.sam_without_patch_embedding_down4 import build_sam_vit_b_1024  # without patch embedding
+from latentdoc.model.vision_encoder.sam_without_patch_embedding import build_sam_vit_b_1024  # without patch embedding
 from latentdoc.model.AE.ae import build_ae_model
 
 
@@ -69,12 +69,11 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         '''
         self.ae_model = build_ae_model()
 
-        self.ae_projector = nn.Linear(768, 768)
-
         self.vision_encoder = build_sam_vit_b_1024()
 
         self.mm_projector = nn.Linear(1024, self.config.hidden_size)
 
+        self._init_mm_projector()
 
     def _init_mm_projector(self, ):
         std = self.config.init_std
@@ -82,22 +81,13 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         if self.mm_projector.bias is not None:
             self.mm_projector.bias.data.zero_()
 
-    def _init_ae_projector(self, ):
-        std = self.config.init_std
-        self.ae_projector.weight.data.normal_(mean=0.0, std=std)
-        if self.ae_projector.bias is not None:
-            self.ae_projector.bias.data.zero_()
-
-    def init_multimodal_module(self, tokenizer, mm_cfg=None, resume=False):
+    def init_multimodal_module(self, tokenizer, mm_cfg=None,  resume=False):
 
         if self.training and not resume:
-
-        
             print('*'*12 + 'initing multimodal module' + '*'*12)
-
+          
             print('*'*6 + 'init the project' + '*'*6)
             self._init_mm_projector()
-            self._init_ae_projector()
 
             self.config.mm_cfg = mm_cfg
 
@@ -111,15 +101,13 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             self._reload_vision_ckpt()
 
         elif self.training and resume:
-
             self.config.mm_cfg = mm_cfg
 
         elif not self.training:
-
             mm_cfg = self.config.mm_cfg
             self.config.mm_cfg = edict(mm_cfg)
+   
           
-
         return tokenizer, mm_cfg
 
     def _reload_vision_ckpt(self,):
@@ -152,7 +140,6 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             
             print(f'missing_keys: {missing_keys}')
             print(f'unexpected_keys: {unexpected_keys}')
-
 
     def _expand_max_length(self,):
         if self.config.mm_cfg.model_max_length > self.config.max_position_embeddings:
@@ -203,10 +190,10 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
             print(f'\nAdded {num_new_tokens} special tokens, the vocab size of llm from {raw_llm_vocab} to {self.config.vocab_size} \n')
 
-
     def embed_tokens(self, input_ids):
 
         return self.get_input_embeddings()(input_ids)
+
 
     def embed_images(self, images):
 
@@ -216,8 +203,6 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         images = self.ae_model.encoder(images)
      
         images = images.permute(0, 2, 3, 1)
-
-        images = self.ae_projector(images)
 
         # without patch embedding
         img_features = self.vision_encoder(images)  # b, l, c
@@ -307,16 +292,23 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         )
         return_dict = return_dict if return_dict is not None else self.config.return_dict
 
-
+        # print(inputs_embeds)
+        # if images is not None:
+        # print(images)
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-
+        # print(inputs_embeds.shape)
+        # print(input_ids.shape)
         if self.training and images is not None:
             img_features = self.embed_images(images)
-            
             inputs_embeds = self.multimodal_process(input_ids, inputs_embeds, img_features)
-
+        # elif images is None and inputs_embeds is not None:
+        #     multimodal_input_embeddings = inputs_embeds
+        # else:
+        #     print(111)
+        # else:
+        #     raise
         
         outputs = self.model.decoder(
             input_ids=None,
@@ -385,7 +377,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             
         else:
             model_inputs = {"input_ids": input_ids}
-  
+        
         model_inputs.update(
             {
                 "past_key_values": past_key_values,
@@ -403,9 +395,11 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
     ):
 
         img_features = self.embed_images(images)
-
+        # print(img_features.shape)
         input_embeddings = self.embed_tokens(input_ids)
         multimodal_input_embeddings = self.multimodal_process(input_ids, input_embeddings, img_features)
+        # print(input_embeddings.shape)
+        # print(multimodal_input_embeddings.shape)
 
         return self.generate(input_ids=input_ids, inputs_embeds=multimodal_input_embeddings, **kwargs)
 
@@ -430,8 +424,6 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         
 
         pass
-
-
 
 
 def build_model():

@@ -1,7 +1,8 @@
 DS_SKIP_CUDA_CHECK=1   \
-deepspeed   --include "localhost:0" --master_port 29501 /home/fdu02/fdu02_dir/lw/code/LatentDoc/latentdoc/train/train_sam_opt_1024.py   \
-            --deepspeed /home/fdu02/fdu02_dir/lw/code/LatentDoc/zero_config/zero0.json \
-            --model_name_or_path   '    '             \
+deepspeed   --include "localhost:0" --master_port 29501 /home/yuhaiyang/zlw/LatentDoc/latentdoc/train/train_sam_qwen2.py   \
+            --deepspeed /home/yuhaiyang/zlw/LatentDoc/zero_config/zero0.json \
+            --model_type  sam_qwen2  \
+            --model_name_or_path   '/home/yuhaiyang/zlw/LatentDoc/exps/test_en/checkpoint-100'             \
             --img_size 512    \
             --img_token_len 64 \
             --freeze_vision_encoder False    \
@@ -13,17 +14,17 @@ deepspeed   --include "localhost:0" --master_port 29501 /home/fdu02/fdu02_dir/lw
             --evaluation_strategy "no"    \
             --save_strategy "steps"    \
             --save_steps 50    \
-            --save_total_limit 10   \
+            --save_total_limit 1   \
             --weight_decay 0.05    \
-            --warmup_ratio 0.03*5   \
+            --warmup_ratio 0.15   \
             --lr_scheduler_type 'cosine_with_restarts' \
             --logging_steps 1 --tf32 True   \
             --model_max_length 2048    \
             --gradient_checkpointing True     \
             --dataloader_num_workers 12      \
             --report_to none       \
-            --per_device_train_batch_size 48   \
-            --num_train_epochs 10         \
+            --per_device_train_batch_size 1   \
+            --num_train_epochs 100         \
             --learning_rate 5e-4        \
-            --datasets  DocVQA_train    \
-            --output_dir /home/fdu02/fdu02_dir/lw/exp/exp_name    \
+            --datasets  test_en    \
+            --output_dir /home/yuhaiyang/zlw/LatentDoc/exps/test-finetune    \

@@ -1,15 +1,14 @@
 DS_SKIP_CUDA_CHECK=1   \
-deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500 /home/fdu02/fdu02_dir/lw/code/LatentDoc/latentdoc/train/train_sam_opt_1024_with_ae_with_projector_down4.py   \
-            --deepspeed /home/fdu02/fdu02_dir/lw/code/LatentDoc/zero_config/zero0.json \
-            --model_name_or_path   /home/fdu02/fdu02_dir/lw/pretrained_weight/models--facebook--opt-125m               \
-            --vision_encoder    /home/fdu02/fdu02_dir/lw/pretrained_weight/sam_vit/sam_vit_b_01ec64.pth \
-            --ae /home/fdu02/fdu02_dir/lw/pretrained_weight/ae_bestmodel.pth   \
+deepspeed   --include "localhost:0" --master_port 29500 /home/yuhaiyang/zlw/LatentDoc/latentdoc/train/train_sam_opt_1024_with_ae.py   \
+            --deepspeed home/fdu02/fdu02_dir/lw/code/LatentDoc/zero_config/zero0.json \
+            --model_type  sam_opt_1024_with_ae_with_projector_down4  \
+            --model_name_or_path   ' '             \
             --img_size 1024    \
             --img_token_len 64 \
             --freeze_vision_encoder False    \
             --freeze_lm_model False      \
             --freeze_ae True  \
-            --resume False \
+            --resume True \
             --bf16 True                \
             --per_device_eval_batch_size 16  \
             --gradient_accumulation_steps 1     \
@@ -18,7 +17,7 @@ deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500 /home/fdu02/fd
             --save_steps 50    \
             --save_total_limit 10   \
             --weight_decay 0.05    \
-            --warmup_ratio 0.03*5   \
+            --warmup_ratio 0.15   \
             --lr_scheduler_type 'cosine_with_restarts' \
             --logging_steps 1 --tf32 True   \
             --model_max_length 2048    \
@@ -26,7 +25,7 @@ deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500 /home/fdu02/fd
             --dataloader_num_workers 12      \
             --report_to none       \
             --per_device_train_batch_size 48   \
-            --num_train_epochs 5         \
+            --num_train_epochs 10         \
             --learning_rate 5e-5        \
-            --datasets  pdf_cn_30k+pdf_en_30k    \
-            --output_dir /home/fdu02/fdu02_dir/lw/exp/    \
+            --datasets  DocVQA_train    \
+            --output_dir /home/fdu02/fdu02_dir/lw/exp/exp_name    \

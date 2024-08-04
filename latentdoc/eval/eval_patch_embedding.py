@@ -1,5 +1,7 @@
 import itertools
 import json, sys, os, random
+import cv2
+from matplotlib import pyplot as plt
 import time, tqdm
 from functools import partial
 from typing import Optional
@@ -11,36 +13,16 @@ import re, copy
 from easydict import EasyDict as edict
 import transformers
 from transformers import TextStreamer
+from latentdoc.eval.utils import compute_similarity_matrix, visualize_heatmap, visualize_similarity_matrix
 from latentdoc.utils.utils import disable_torch_init, KeywordsStoppingCriteria
-
+from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon import LatentDocOPTForCausalLM, LatentDocConfig
+# from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.AE.ae import build_test_transforms
+# from latentdoc.model.vision_encoder.sam import build_test_transforms
 from latentdoc.eval.metric.anls import anls_score
 from latentdoc.eval.metric.acc import Is_correct
-
-
-
-def customer_import(model_type):
-    global LatentDocOPTForCausalLM, LatentDocConfig, build_test_transforms
-    
-    if model_type == 'sam_opt_1024':
-        from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.vision_encoder.sam import build_test_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae':
-        from latentdoc.model.sam_opt_1024_with_ae import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_test_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae_down4':
-        from latentdoc.model.sam_opt_1024_with_ae_down4 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_test_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae_with_projector_down2':
-        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down2 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_test_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae_with_projector_down4_recon':
-        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_test_transforms
-
+from torchvision import datasets, transforms
+import torch.nn as nn
 def relaxed_correctness(target: str,
                         prediction: str,
                         max_relative_change: float = 0.05) -> bool:
@@ -171,6 +153,7 @@ def infer_dataset(model_name_or_path, eval_data, img_root):
 
     return pred_res
 
+
 def calculate_metric_v1(gt_json_path, pre_json_path):
     with open(gt_json_path, 'r') as f:
         gt_data = json.load(f)
@@ -195,6 +178,7 @@ def calculate_metric_v1(gt_json_path, pre_json_path):
         json.dump(pred_data, f, ensure_ascii=False)
 
     return total, correct
+
 
 def calculate_acc(pre_json_path, numeric_toleration=0.5, str_relaxed=False):
 
@@ -230,6 +214,7 @@ def calculate_anls(pre_json_path, threshold=0.5):
 
     return total, correct 
 
+
 def eval_DocVQA():
     model_name_or_path = r'/home/fdu02/fdu02_dir/zyl/exp/(7-7)input_1024_token_num_64_ae_aefrozen_finetune/'
     json_path = '/home/fdu02/fdu02_dir/lw/data/DocVQA/train_conv.json'
@@ -262,34 +247,116 @@ def eval_DocVQA():
         with open(save_path, 'w') as f:
             json.dump(pred_res, f, ensure_ascii=False)
         print(f'The result of prediction is saved in {save_path}')
- 
+    
+    # 计算评测指标
+    
+    
+    # save_path = f'{model_name_or_path}/DocVQA_pred.json'
+    # infer_datasets(model_name_or_path, json_path, img_root, save_path)
+    # total, correct = calculate_metric(json_path, save_path)
+    # print(f'model name: {model_name_or_path}')
+    # print(f'result save path: {save_path}')
+    # print(f'total num: {total}, correct num: {correct}, acc: {correct/total}')
 
+import os
+import fnmatch
 
+def find_test_json_files(root_path):
+    """
+    递归查找指定目录下所有名为"test.json"的文件，并返回它们的绝对路径列表。
+    
+    :param root_path: 查找的根目录
+    :return: 包含所有匹配文件绝对路径的列表
+    """
+    matches = []
+    
+    for root, dirnames, filenames in os.walk(root_path):
+        for filename in fnmatch.filter(filenames, 'DocVQA_pred.json'):
+            matches.append(os.path.join(root, filename))
+    
+    return matches
+def get_ae_without_last_bn(ae_encoder):
+    ae_encoder_layers=ae_encoder[:-1]
+    ae_encoder_last_layer=ae_encoder[-1]
+    ae_encoder_last_layer_residual_function=ae_encoder_last_layer.downsample_conv.residual_function[:-1]
+    ae_encoder_last_layer_residual_function_bn=ae_encoder_last_layer.downsample_conv.residual_function[-1]
+    ae_encoder_last_layer_shortcut=ae_encoder_last_layer.downsample_conv.shortcut[:-1]
+    ae_encoder_last_layer_shortcut_bn=ae_encoder_last_layer.downsample_conv.shortcut[-1]
+    return ae_encoder_layers,ae_encoder_last_layer_residual_function,ae_encoder_last_layer_shortcut,ae_encoder_last_layer_residual_function_bn,ae_encoder_last_layer_shortcut_bn
+
+def anti_sigmoid(tensor):
+    res=torch.exp(tensor)
+    return res
 
 if __name__ == '__main__':
+    model_name_or_path='exps/recon_test_2/checkpoint-45400'
+    # model_name_or_path='exp/ae_noforzen_checkpoint-48500'
+    # model_name_or_path='exp/checkpoint-78500'
+    device='cuda'
+    dtype=torch.bfloat16
+    model, tokenizer, img_processor, mm_cfg = init_model(model_name_or_path)
+    img_token = mm_cfg.special_tokens.img_token
+    # print(model)
+    # 获取ae模型及projector参数
+    ae_projector=model.ae_projector.to(device=device, dtype=dtype)
+    ae_model=model.ae_model.to(device=device, dtype=dtype)
+    inc=ae_model.inc.to(device=device, dtype=dtype)
+    ae_encoder=ae_model.encoder.to(device=device, dtype=dtype)
+    encoder_without_lastbn,ae_encoder_last_layer_residual_function,ae_encoder_last_layer_shortcut,last_layer_residual_function_bn,last_layer_shortcut_bn=get_ae_without_last_bn(ae_encoder)
+    outc=ae_model.outc
+    decoder=ae_model.decoder
+    # #获取patch embedding参数
+    # patch_embed=model.vision_encoder.patch_embed.to(device=device, dtype=dtype)
+    # print(model.vision_encoder.patch_embed)
 
-    # preform customer import
-    model_type = 'sam_opt_1024_with_ae_with_projector_down4_recon'
-    customer_import(model_type)
+    img_path='/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/sample_ch.png'
+    img = load_image(img_path) 
+    output_name='output.png'
+    images = img_processor(img).unsqueeze(dim=0).to(device=device, dtype=dtype)
 
-    # eval and save the pred
-    model_name_or_path = 'exps/recon_test_without_ae_pretrain/checkpoint-200'
-    eval_json_path = '/home/yuhaiyang/zlw/dataset/Vary-600k/test_ch.json'
-    img_root = '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs_2/'
-    temp_res_save_path = os.path.join(model_name_or_path, 'eval_res.json')
+    # ae
+    # encode=ae_projector(ae_encoder(inc(images)).permute(0,2,3,1))
 
-    with open(eval_json_path) as f:
-        eval_data = json.load(f)
-    pred_res = infer_dataset(model_name_or_path, eval_data, img_root)
+    encode=ae_encoder(inc(images))
+    # print(ae_encoder)
+    
+    
+    encode= encode.permute(0,2,3,1)
+    encode_without_last_layer= encoder_without_lastbn(inc(images))
+    encode_without_last_bn=ae_encoder_last_layer_residual_function(encode_without_last_layer)\
+                            +ae_encoder_last_layer_shortcut(encode_without_last_layer)
+    encode_after_last_bn=last_layer_residual_function_bn(ae_encoder_last_layer_residual_function(encode_without_last_layer))\
+                            +last_layer_shortcut_bn(ae_encoder_last_layer_shortcut(encode_without_last_layer))
+    encode_my=nn.ReLU(inplace=True)(encode_after_last_bn)
+    output=outc(decoder(encode_my)).squeeze(0).permute(1,2,0).detach().to(torch.float).cpu().numpy()
+    encode_my=anti_sigmoid(encode_my).permute(0,2,3,1)
+    print(torch.sum(encode-encode_my))
+    #patch embedding
+    # encode=patch_embed(images)
 
-    # save the pred res
-    with open(temp_res_save_path, 'w') as f:
-        json.dump(pred_res, f, ensure_ascii=False)
- 
-    # calculate the metric
-    total, correct=calculate_acc(temp_res_save_path, numeric_toleration=0, str_relaxed=True)
-    print('acc in\t', correct/total)
-    total, correct=calculate_acc(temp_res_save_path, numeric_toleration=0, str_relaxed=False)
-    print('acc ==\t', correct/total)
-    total, correct=calculate_anls(temp_res_save_path)
-    print('anls\t', correct/total)
+    print(encode.shape)
+
+    ori_img=cv2.imread(img_path)
+    ori_img=cv2.cvtColor(ori_img,cv2.COLOR_BGR2RGB)
+    similarity_matrix=compute_similarity_matrix(encode.unsqueeze(0))
+    # visualize_similarity_matrix(similarity_matrix)
+    # visualize_similarity_matrix(similarity_matrix[755:756,:].repeat(30,1))
+    # visualize_heatmap(ori_img,similarity_matrix[200].reshape(32,32).detach().cpu().numpy())
+
+    similarity_matrix_without_lastbn=compute_similarity_matrix(encode_my.unsqueeze(0))
+    visualize_similarity_matrix(similarity_matrix_without_lastbn)
+    visualize_heatmap(ori_img,similarity_matrix_without_lastbn[200].reshape(32,32).detach().cpu().numpy())
+    # print(similarity_matrix)
+    # print(similarity_matrix_without_lastbn)
+
+    plt.figure(figsize=(11, 10)) 
+    plt.imshow(img)
+    plt.gray()
+    plt.axis('off')
+    plt.savefig(output_name)
+    plt.figure(figsize=(11, 10)) 
+    plt.imshow(output)
+    plt.gray()
+    plt.axis('off')
+    plt.savefig('output.png')
+    # print(model.vision_encoder.patch_embed)

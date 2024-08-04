@@ -4,7 +4,8 @@ Copyright (c) Meta Platforms, Inc. and affiliates.
 This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
 
-原始的vary在sam的vit后面使用两个卷积进行下采样,为和最终的img-token-len(16*16)对齐,删除一个卷积层，下采样倍率为2
+第150行， 原始的vary在sam的vit后面使用两个卷积进行下采样,为和最终的img-token-len(16*16)对齐,删除一个卷积层，下采样倍率为2
+
 """
 
 import torch

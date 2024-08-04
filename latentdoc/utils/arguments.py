@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, List
 import transformers
 
 
@@ -14,6 +14,7 @@ class ModelArguments:
     freeze_vision_encoder: bool = field(default=False)
     freeze_lm_model: bool = field(default=False)
     freeze_ae: bool = field(default=True)
+    model_type: str = field(default="sam_opt_1024")
    
 
 @dataclass
@@ -46,8 +47,21 @@ class TrainingArguments(transformers.TrainingArguments):
         },
     )
     lora_enable: bool = False
-    lora_r: int = 8
+    lora_r: int = 64
     lora_alpha: int = 16
     lora_dropout: float = 0.05
+    lora_target_modules: List[str] = field(
+        default_factory=lambda: [
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "up_proj",
+            "gate_proj",
+            "down_proj",
+        ]
+    )
     lora_weight_path: str = ""
     lora_bias: str = "none"
+    q_lora: bool = False
+
