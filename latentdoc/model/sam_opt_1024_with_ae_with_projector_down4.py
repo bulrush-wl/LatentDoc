@@ -211,7 +211,6 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
     def embed_images(self, images):
 
         # add ae encoder
-        self.ae_model.eval()
         images = self.ae_model.inc(images)
         images = self.ae_model.encoder(images)
      

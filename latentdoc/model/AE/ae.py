@@ -258,15 +258,58 @@ class UNet_ds64(nn.Module):
         logits = self.outc(x)
         return logits
 
-def build_ae_model():
-    weight_path = '/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/ae_bestmodel.pth'
-    ae_model = model_init(weight_path)
+class UNet_ds64_deep_channel(nn.Module):
+    def __init__(self, n_channels, n_classes, bilinear=False):
+        super(UNet_ds64_deep_channel, self).__init__()
+        self.n_channels = n_channels
+        self.n_classes = n_classes
+        self.bilinear = bilinear
+
+        self.inc = (DoubleConv(n_channels, 128))
+        self.down1 = (deep_Down(128, 128))
+        self.down2 = (deep_Down(128, 256))
+        self.down3 = (deep_Down(256, 256))
+        self.down4 = (deep_Down(256, 512))
+        self.down5 = (deep_Down(512, 768))
+        self.down6 = (deep_Down(768, 768))
+        self.encoder=nn.Sequential(
+            self.down1,self.down2,self.down3,self.down4,self.down5,self.down6
+        )
+        self.up1 = (deep_Up_without_res(768, 768, bilinear))
+        self.up2 = (deep_Up_without_res(768, 512, bilinear))
+        self.up3 = (deep_Up_without_res(512, 256 , bilinear))
+        self.up4 = (deep_Up_without_res(256, 256 , bilinear))
+        self.up5 = (deep_Up_without_res(256, 128, bilinear))
+        self.up6 = (deep_Up_without_res(128, 128, bilinear))
+        self.decoder=nn.Sequential(
+            self.up1,self.up2,self.up3,self.up4,self.up5,self.up6
+        )
+        self.outc = (OutConv(128, n_classes))
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        # x2 = self.down1(x1)
+        # x3 = self.down2(x2)
+        # x4 = self.down3(x3)
+        # x5 = self.down4(x4)
+        # x = self.up1(x5)
+        # x = self.up2(x)
+        # x = self.up3(x)
+        # x = self.up4(x)
+        x=self.encoder(x1)
+        x=self.decoder(x)
+        logits = self.outc(x)
+        return logits
+
+def build_ae_model(downsample_rate=32):
+    ae_model = model_init(downsample_rate)
     return ae_model
 
-def model_init(pth_path, downsample_rate=32):
-
-    model = UNet_ds32(n_channels=3, n_classes=3).cuda()
- 
+def model_init(downsample_rate=32):
+    if downsample_rate==32:
+        model = UNet_ds32(n_channels=3, n_classes=3).cuda()
+    elif downsample_rate==64:
+        model = UNet_ds64_deep_channel(n_channels=3, n_classes=3).cuda()
     # checkpoint={k.replace('module.', ''): v for k, v in                 
     #                    torch.load(pth_path).items()}
 

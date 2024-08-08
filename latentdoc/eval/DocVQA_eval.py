@@ -15,7 +15,7 @@ from latentdoc.utils.utils import disable_torch_init, KeywordsStoppingCriteria
 from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4 import LatentDocOPTForCausalLM, LatentDocConfig
 # from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
 
-from latentdoc.model.vision_encoder.sam import build_test_transforms
+from latentdoc.model.AE.ae import build_test_transforms
 from latentdoc.eval.metric.anls import anls_score
 from latentdoc.eval.metric.acc import Is_correct
 

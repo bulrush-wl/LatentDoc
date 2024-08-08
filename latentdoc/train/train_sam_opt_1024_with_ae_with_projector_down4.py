@@ -91,6 +91,7 @@ def train():
 
     # freeze the ae_model
     if model_args.freeze_ae:
+        model.ae_model.eval()
         model.ae_model.requires_grad_(False)
 
     params_grad = [p.numel() for n, p in model.named_parameters() if p.requires_grad]
