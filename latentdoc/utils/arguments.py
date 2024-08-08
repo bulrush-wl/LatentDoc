@@ -17,6 +17,7 @@ class ModelArguments:
     model_type: str = field(default="sam_opt_1024")
     with_ae_loss:bool =field(default=False)
     ae_loss_weight:float =field(default=10)
+    is_ae_eval:bool =field(default=True)
    
 
 @dataclass

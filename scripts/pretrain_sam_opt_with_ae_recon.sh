@@ -12,6 +12,7 @@ deepspeed   --include "localhost:0" --master_port 29500  /home/yuhaiyang/zyl/cod
             --freeze_vision_encoder False    \
             --freeze_lm_model False      \
             --freeze_ae False  \
+            --is_ae_eval False \
             --resume False \
             --bf16 True                \
             --per_device_eval_batch_size 1  \

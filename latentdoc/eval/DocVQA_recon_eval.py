@@ -239,49 +239,6 @@ def calculate_anls(pre_json_path, threshold=0.5):
 
     return total, correct 
 
-def eval_DocVQA():
-    model_name_or_path = r'/home/fdu02/fdu02_dir/zyl/exp/(7-7)input_1024_token_num_64_ae_aefrozen_finetune/'
-    json_path = '/home/fdu02/fdu02_dir/lw/data/DocVQA/train_conv.json'
-    img_root = '/home/fdu02/fdu02_dir/lw/data/DocVQA/image'
-    save_name = 'DocVQA_pred_train.json'
-    with_ae_los =False
-    ae_loss_weight= 10
-    # 获得当前目录下所有的ckpt
-    # ckpt_names = [ dir_name for dir_name in os.listdir(model_name_or_path) if 'checkpoint-' in dir_name]
-    ckpt_names = ['checkpoint-1000']
-
-    model_name_or_paths = [model_name_or_path]
-    model_name_or_paths += [ os.path.join(model_name_or_path, ckpt_name) for ckpt_name in ckpt_names]
-
-    # 读取数据集json文件
-    with open(json_path, 'r') as f:
-        eval_data = json.load(f)
-
-    # 对每个ckpt进行预测
-    for model_name_or_path in model_name_or_paths:
-
-        # 该ckpt已经预测过
-        # if save_name in os.listdir(model_name_or_path):
-        #     continue
-
-        # infer
-        save_path = os.path.join(model_name_or_path, save_name)
-        pred_res = infer_dataset(model_name_or_path, eval_data, img_root,with_ae_loss=False,ae_loss_weight)
-
-        # 保存预测结果
-        with open(save_path, 'w') as f:
-            json.dump(pred_res, f, ensure_ascii=False)
-        print(f'The result of prediction is saved in {save_path}')
-    
-    # 计算评测指标
-    
-    
-    # save_path = f'{model_name_or_path}/DocVQA_pred.json'
-    # infer_datasets(model_name_or_path, json_path, img_root, save_path)
-    # total, correct = calculate_metric(json_path, save_path)
-    # print(f'model name: {model_name_or_path}')
-    # print(f'result save path: {save_path}')
-    # print(f'total num: {total}, correct num: {correct}, acc: {correct/total}')
 
 import os
 import fnmatch

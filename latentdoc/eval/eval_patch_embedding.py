@@ -15,14 +15,70 @@ import transformers
 from transformers import TextStreamer
 from latentdoc.eval.utils import compute_similarity_matrix, visualize_heatmap, visualize_similarity_matrix
 from latentdoc.utils.utils import disable_torch_init, KeywordsStoppingCriteria
-from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon import LatentDocOPTForCausalLM, LatentDocConfig
+# from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon import LatentDocOPTForCausalLM, LatentDocConfig
 # from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
-from latentdoc.model.AE.ae import build_test_transforms
+# from latentdoc.model.AE.ae import build_test_transforms
 # from latentdoc.model.vision_encoder.sam import build_test_transforms
 from latentdoc.eval.metric.anls import anls_score
 from latentdoc.eval.metric.acc import Is_correct
 from torchvision import datasets, transforms
 import torch.nn as nn
+
+import argparse
+import torch
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Process some inputs for the model.")
+    
+    # Add arguments for the model type and model path
+    parser.add_argument('--model_type', type=str, default='sam_opt_1024_with_ae_with_projector_down4_recon',
+                        help='Type of the model to use.')
+    parser.add_argument('--model_name_or_path', type=str, default='exps/recon_test_without_ae_pretrain_aeloss_10/checkpoint-96600',
+                        help='Path to the model checkpoint.')
+    
+    # Add arguments for device and dtype
+    parser.add_argument('--device', type=str, default='cuda',
+                        help='Device to run the model on (e.g., "cuda" or "cpu").')
+
+    # Add arguments for image path and output name
+    parser.add_argument('--img_path', type=str, default='/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/sample_ch.png',
+                        help='Path to the input image.')
+    parser.add_argument('--output_name', type=str, default='output.png',
+                        help='Name of the output file.')
+
+    args = parser.parse_args()
+    
+
+    return args
+
+
+
+def customer_import(model_type):
+
+    global LatentDocOPTForCausalLM, LatentDocConfig, build_test_transforms
+
+    if model_type == 'sam_opt_1024_with_ae':
+        from latentdoc.model.sam_opt_1024_with_ae import LatentDocOPTForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_test_transforms
+
+    elif model_type == 'sam_opt_1024_with_ae_down4':
+        from latentdoc.model.sam_opt_1024_with_ae_down4 import LatentDocOPTForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_test_transforms
+
+    elif model_type == 'sam_opt_1024_with_ae_with_projector_down2':
+        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down2 import LatentDocOPTForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_test_transforms
+
+    elif model_type == 'sam_opt_1024_with_ae_with_projector_down4_recon':
+        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon import LatentDocOPTForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_test_transforms
+    elif model_type == 'sam_opt_1024_with_ae_with_projector_down4_recon_test':
+        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon_test import LatentDocOPTForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_test_transforms
+    else:
+        print(f'There is no {model_type}')
+        exit()
+
 def relaxed_correctness(target: str,
                         prediction: str,
                         max_relative_change: float = 0.05) -> bool:
@@ -288,8 +344,12 @@ def anti_sigmoid(tensor):
     res=torch.exp(tensor)
     return res
 
+
+
 if __name__ == '__main__':
-    model_name_or_path='exps/recon_test_without_ae_pretrain_aeloss_10/checkpoint-12600'
+    model_type='sam_opt_1024_with_ae_with_projector_down4_recon'
+    customer_import(model_type)
+    model_name_or_path='exps/recon_test_without_ae_pretrain_aeloss_10/checkpoint-96600'
     # model_name_or_path='exp/ae_noforzen_checkpoint-48500'
     # model_name_or_path='exp/checkpoint-78500'
     device='cuda'

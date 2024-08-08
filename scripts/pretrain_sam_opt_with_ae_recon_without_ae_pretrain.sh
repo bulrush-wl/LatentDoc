@@ -4,11 +4,14 @@ deepspeed   --include "localhost:1" --master_port 29501  /home/yuhaiyang/zyl/cod
             --model_type  sam_opt_1024_with_ae_with_projector_down4_recon  \
             --model_name_or_path   /home/yuhaiyang/zyl/code/LatentDoc/pretrained_weight/models--facebook--opt-125m               \
             --vision_encoder    /home/yuhaiyang/zyl/code/LatentDoc/pretrained_weight/sam_vit_b_01ec64.pth \
+            --with_ae_loss True  \
+            --ae_loss_weight 11 \
             --img_size 1024    \
             --img_token_len 64 \
             --freeze_vision_encoder False    \
             --freeze_lm_model False      \
             --freeze_ae False  \
+            --is_ae_eval False \
             --resume False \
             --bf16 True                \
             --per_device_eval_batch_size 1  \

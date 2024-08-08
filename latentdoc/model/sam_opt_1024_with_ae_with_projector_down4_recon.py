@@ -66,7 +66,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
     def __init__(self, config: OPTConfig):
         super(LatentDocOPTForCausalLM, self).__init__(config)
         self.with_ae_loss=False
-        if config.with_ae_loss==True:
+        if hasattr(config,'with_ae_loss') and config.with_ae_loss==True:
             self.with_ae_loss=config.with_ae_loss
             self.ae_loss_weight=config.ae_loss_weight
 
