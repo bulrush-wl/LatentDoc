@@ -30,12 +30,21 @@ from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
 
 def customer_import(model_type):
-    
-    if model_type == 'sam_opt_1024':
-        global LatentDocOPTForCausalLM, LatentDocConfig, build_train_transforms
-        from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.vision_encoder.sam import build_train_transforms
-        
+
+    global LatentDocOPTForCausalLM, LatentDocConfig, build_train_transforms
+
+    if model_type == 'sam_opt_1024_with_ae':
+        from latentdoc.model.sam_opt_1024_with_ae import LatentDocOPTForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_train_transforms
+
+    elif model_type == 'sam_opt_1024_with_ae_down4':
+        from latentdoc.model.sam_opt_1024_with_ae_down4 import LatentDocOPTForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_train_transforms
+
+    elif model_type == 'sam_opt_1024_with_ae_with_projector_down2':
+        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down2 import LatentDocOPTForCausalLM, LatentDocConfig
+        from latentdoc.model.AE.ae import build_train_transforms
+
     else:
         print(f'There is no {model_type}')
         exit()
@@ -70,6 +79,7 @@ def train():
     mm_cfg.vision_encoder = model_args.vision_encoder
     mm_cfg.img_size = model_args.img_size
     mm_cfg.img_token_len = model_args.img_token_len
+    mm_cfg.ae = model_args.ae
     
     # build and init the tokenizer
     tokenizer, mm_cfg = init_tokenizer(model_args.model_name_or_path, mm_cfg)
@@ -80,7 +90,7 @@ def train():
     # build and init the model
     model = LatentDocOPTForCausalLM.from_pretrained(model_args.model_name_or_path)
     model.train()
-    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg, resume=training_args.resume)
+    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
 
 
     dtype = torch.float32
@@ -91,7 +101,6 @@ def train():
 
     model.to(dtype=dtype, device=training_args.device)
 
-  
     if model_args.freeze_lm_model:
         model.model.requires_grad_(False)
         for p in model.model.get_input_embeddings().parameters():
@@ -100,7 +109,6 @@ def train():
     if model_args.freeze_vision_encoder:
         model.vision_encoder.requires_grad_(False)
 
-    
     # freeze the ae_model
     if model_args.freeze_ae:
         try:

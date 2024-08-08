@@ -1,5 +1,4 @@
 {
-    "communication_library": "gloo",
     "bf16": {
         "enabled": true
     },

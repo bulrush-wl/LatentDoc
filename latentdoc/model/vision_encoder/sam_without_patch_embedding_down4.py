@@ -3,7 +3,12 @@ Copyright (c) Meta Platforms, Inc. and affiliates.
 
 This source code is licensed under the MIT license found in the
 LICENSE file in the root directory of this source tree.
+
+依然使用两个卷积进行下采样，每个卷积下采样倍率为4
+
 """
+
+
 
 import torch
 import torch.nn as nn
@@ -96,12 +101,12 @@ class ImageEncoderViT(nn.Module):
         super().__init__()
         self.img_size = img_size
 
-        self.patch_embed = PatchEmbed(
-            kernel_size=(patch_size, patch_size),
-            stride=(patch_size, patch_size),
-            in_chans=in_chans,
-            embed_dim=embed_dim,
-        )
+        # self.patch_embed = PatchEmbed(
+        #     kernel_size=(patch_size, patch_size),
+        #     stride=(patch_size, patch_size),
+        #     in_chans=in_chans,
+        #     embed_dim=embed_dim,
+        # )
 
         self.pos_embed: Optional[nn.Parameter] = None
         if use_abs_pos:
@@ -144,20 +149,18 @@ class ImageEncoderViT(nn.Module):
             LayerNorm2d(out_chans),
         )
 
+        # self.net_2 = nn.Conv2d(256, 1024, kernel_size=3, stride=2, padding=1, bias=False)
         self.net_2 = nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1, bias=False)
         self.net_3 = nn.Conv2d(512, 1024, kernel_size=3, stride=2, padding=1, bias=False)
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.patch_embed(x)
+        # x = self.patch_embed(x)
+
 
         b, h, w, c = x.shape
         if self.pos_embed is not None:
             x = x + self.pos_embed[:, :h, :w, :]
-
-        # print(x.shape)
-        # if self.pos_embed is not None:
-        #     x = x + self.pos_embed
 
         for blk in self.blocks:
             x = blk(x)

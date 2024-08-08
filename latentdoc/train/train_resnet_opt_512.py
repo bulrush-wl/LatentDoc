@@ -24,21 +24,45 @@ import torch
 import transformers
 from easydict import EasyDict as edict
 
-from latentdoc.utils.constant import MM_CFG
+from latentdoc.utils.constant import MM_CFG as mm_cfg
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
+from latentdoc.model.resnet_opt_512 import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.vision_encoder.resnet import build_train_transforms
 
-def customer_import(model_type):
-    
-    if model_type == 'sam_opt_1024':
-        global LatentDocOPTForCausalLM, LatentDocConfig, build_train_transforms
-        from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.vision_encoder.sam import build_train_transforms
-        
-    else:
-        print(f'There is no {model_type}')
-        exit()
+
+
+def build_mm_cfg():
+    DEFAULT_IMAGE_TOKEN = '<image>'
+    DEFAULT_IMAGE_PATCH_TOKEN = '<imgpad>'
+    DEFAULT_IMG_START_TOKEN = '<img>'
+    DEFAULT_IMG_END_TOKEN = '</img>'
+    DEFAULT_IM_START_TOKEN = '<|im_start|>'
+    DEFAULT_IM_END_TOKEN = '<|im_end|>' 
+    IGNORE_INDEX = -100
+
+    special_tokens = {
+                'img_token': '<image>',
+                'img_patch_token': '<img_patch>',
+                'im_start_token': '<|im_start|>',
+                'im_end_token': '<|im_end|>' ,
+                'img_start_token': '<img>',
+                'img_end_token': '</img>',
+        }
+
+    mm_cfg = {
+            'img_token_len': 256,
+            'model_max_length': 2048,
+            'output_attentions': True,
+            'output_hidden_states': True,
+            'img_size': 512,
+            'return_dict': True,
+            'special_tokens': special_tokens
+        }
+
+    mm_cfg = edict(mm_cfg)
+    return mm_cfg
 
 def init_tokenizer(model_name_or_path, mm_cfg):
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
@@ -54,22 +78,17 @@ def init_tokenizer(model_name_or_path, mm_cfg):
 
     return tokenizer, mm_cfg
 
-
 def train():
     
     # parse the argument 
     parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    # perform customer import
-    customer_import(model_args.model_type)
-
     # build and init the mmcfg 
-    mm_cfg = deepcopy(MM_CFG)
+    # mm_cfg = build_mm_cfg()
     mm_cfg.model_max_length = training_args.model_max_length
     mm_cfg.vision_encoder = model_args.vision_encoder
     mm_cfg.img_size = model_args.img_size
-    mm_cfg.img_token_len = model_args.img_token_len
     
     # build and init the tokenizer
     tokenizer, mm_cfg = init_tokenizer(model_args.model_name_or_path, mm_cfg)
@@ -80,7 +99,7 @@ def train():
     # build and init the model
     model = LatentDocOPTForCausalLM.from_pretrained(model_args.model_name_or_path)
     model.train()
-    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg, resume=training_args.resume)
+    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
 
 
     dtype = torch.float32
@@ -100,14 +119,7 @@ def train():
     if model_args.freeze_vision_encoder:
         model.vision_encoder.requires_grad_(False)
 
-    
-    # freeze the ae_model
-    if model_args.freeze_ae:
-        try:
-            model.ae_model.requires_grad_(False)
-        except:
-            print(f'There is no ae model, freeze_ae will not perform.')
-
+                
     params_grad = [p.numel() for n, p in model.named_parameters() if p.requires_grad]
     print(f"Number of Mapping Trainable Parameters: {sum(params_grad) / (1 << 20):.2f} M")
 

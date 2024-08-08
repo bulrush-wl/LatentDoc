@@ -8,12 +8,26 @@ import torch
 import transformers
 from typing import List, Optional, Tuple, Union, Dict, Sequence
 from torch.utils.data import Dataset
-from latentdoc.utils.constant import DATASET_INFO
 from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 IGNORE_INDEX = -100
+DATASET_INFO = {
+    'zhongtie_doc': {
+        'images': '/home/yuhaiyang/zlw/dataset/doc/val_imgs/',
+        'annotations': '/home/yuhaiyang/zlw/dataset/doc/doc_conv_val.json',
+    },
+    
+    'test': {
+        'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
+        'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test.json',
+    },
 
+    'test2': {
+        'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
+        'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test2.json',
+    }
+}
 
 
 class SimpleConversationDateset(Dataset):
@@ -130,13 +144,6 @@ class SimpleConversationDateset(Dataset):
 
         # mask targets
         total_len = int(targets.ne(self.tokenizer.pad_token_id).sum())
-
-        # 防止bos，eos和pad三者一样
-        if self.tokenizer.pad_token_id == self.tokenizer.bos_token_id:
-            total_len += 1
-        if self.tokenizer.pad_token_id == self.tokenizer.eos_token_id:
-            total_len += 1
-
         sep = self.im_end_token+self.im_start_token+'gpt:'
         cur_len = 0
         for i, rou in enumerate(rounds):
@@ -186,9 +193,7 @@ class SimpleConversationDateset(Dataset):
         return len(self.list_data_dict)
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        
-        # i = 0
-        # print(self.list_data_dict[i])
+
         data = copy.deepcopy(self.list_data_dict[i])
 
         # process conversations
@@ -202,19 +207,22 @@ class SimpleConversationDateset(Dataset):
         image_file = data['image']
 
         try:
-            image = Image.open(image_path + image_file).convert('RGB')
+            image_raw = Image.open(image_path + image_file).convert('RGB')
         except:
             print(f'cannot identify image file {image_path + image_file}.')
             return self.__getitem__(0)
 
         try:
-            image = self.image_preprocess(image)
+            image = self.image_preprocess(image_raw)
         except:
             print(f'image {image_file} are broken or grayscale! we thus select 0-th sample instead!')
             return self.__getitem__(0)
 
-        data_dict['images'] = image
-        
+        data_dict['images'] = image_raw
+        data_dict['raw_data'] = copy.deepcopy(self.list_data_dict[i])
+
+
+
         return data_dict
 
 

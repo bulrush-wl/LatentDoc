@@ -28,17 +28,10 @@ from latentdoc.utils.constant import MM_CFG
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
+from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4 import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.AE.ae import build_train_transforms
 
-def customer_import(model_type):
-    
-    if model_type == 'sam_opt_1024':
-        global LatentDocOPTForCausalLM, LatentDocConfig, build_train_transforms
-        from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.vision_encoder.sam import build_train_transforms
-        
-    else:
-        print(f'There is no {model_type}')
-        exit()
+
 
 def init_tokenizer(model_name_or_path, mm_cfg):
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
@@ -54,15 +47,11 @@ def init_tokenizer(model_name_or_path, mm_cfg):
 
     return tokenizer, mm_cfg
 
-
 def train():
     
     # parse the argument 
     parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    # perform customer import
-    customer_import(model_args.model_type)
 
     # build and init the mmcfg 
     mm_cfg = deepcopy(MM_CFG)
@@ -70,6 +59,7 @@ def train():
     mm_cfg.vision_encoder = model_args.vision_encoder
     mm_cfg.img_size = model_args.img_size
     mm_cfg.img_token_len = model_args.img_token_len
+    mm_cfg.ae = model_args.ae
     
     # build and init the tokenizer
     tokenizer, mm_cfg = init_tokenizer(model_args.model_name_or_path, mm_cfg)
@@ -91,7 +81,6 @@ def train():
 
     model.to(dtype=dtype, device=training_args.device)
 
-  
     if model_args.freeze_lm_model:
         model.model.requires_grad_(False)
         for p in model.model.get_input_embeddings().parameters():
@@ -100,13 +89,9 @@ def train():
     if model_args.freeze_vision_encoder:
         model.vision_encoder.requires_grad_(False)
 
-    
     # freeze the ae_model
     if model_args.freeze_ae:
-        try:
-            model.ae_model.requires_grad_(False)
-        except:
-            print(f'There is no ae model, freeze_ae will not perform.')
+        model.ae_model.requires_grad_(False)
 
     params_grad = [p.numel() for n, p in model.named_parameters() if p.requires_grad]
     print(f"Number of Mapping Trainable Parameters: {sum(params_grad) / (1 << 20):.2f} M")

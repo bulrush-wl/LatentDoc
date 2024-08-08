@@ -15,7 +15,7 @@
 #    limitations under the License.
 
 import os
-
+import importlib
 # os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from copy import deepcopy
 import logging
@@ -30,15 +30,13 @@ from latentdoc.data import make_supervised_data_module
 from latentdoc.train.latentdoc_trainer import LatentDocTrainer
 
 def customer_import(model_type):
-    
-    if model_type == 'sam_opt_1024':
-        global LatentDocOPTForCausalLM, LatentDocConfig, build_train_transforms
-        from latentdoc.model.sam_opt_1024 import LatentDocOPTForCausalLM, LatentDocConfig
+    if model_type == 'sam_qwen2':
+        global LatentDocQwen2ForCausalLM, LatentDocConfig, build_train_transforms
+        from latentdoc.model.sam_qwen2 import LatentDocQwen2ForCausalLM, LatentDocConfig
         from latentdoc.model.vision_encoder.sam import build_train_transforms
-        
     else:
         print(f'There is no {model_type}')
-        exit()
+        exit()  
 
 def init_tokenizer(model_name_or_path, mm_cfg):
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
@@ -62,7 +60,7 @@ def train():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     # perform customer import
-    customer_import(model_args.model_type)
+    customer_import(model_args.model_type) 
 
     # build and init the mmcfg 
     mm_cfg = deepcopy(MM_CFG)
@@ -70,6 +68,7 @@ def train():
     mm_cfg.vision_encoder = model_args.vision_encoder
     mm_cfg.img_size = model_args.img_size
     mm_cfg.img_token_len = model_args.img_token_len
+    mm_cfg.ae = model_args.ae
     
     # build and init the tokenizer
     tokenizer, mm_cfg = init_tokenizer(model_args.model_name_or_path, mm_cfg)
@@ -78,9 +77,9 @@ def train():
     img_processor = build_train_transforms(img_size=mm_cfg.img_size)
 
     # build and init the model
-    model = LatentDocOPTForCausalLM.from_pretrained(model_args.model_name_or_path)
+    model = LatentDocQwen2ForCausalLM.from_pretrained(model_args.model_name_or_path)
     model.train()
-    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg, resume=training_args.resume)
+    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
 
 
     dtype = torch.float32
@@ -91,7 +90,6 @@ def train():
 
     model.to(dtype=dtype, device=training_args.device)
 
-  
     if model_args.freeze_lm_model:
         model.model.requires_grad_(False)
         for p in model.model.get_input_embeddings().parameters():
@@ -100,11 +98,10 @@ def train():
     if model_args.freeze_vision_encoder:
         model.vision_encoder.requires_grad_(False)
 
-    
     # freeze the ae_model
     if model_args.freeze_ae:
         try:
-            model.ae_model.requires_grad_(False)
+            model.ae_model.requires_grad_(False)  # 是否要冻住bn
         except:
             print(f'There is no ae model, freeze_ae will not perform.')
 

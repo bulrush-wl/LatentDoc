@@ -6,7 +6,10 @@ from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from easydict import EasyDict as edict
 from latentdoc.model.llm.opt import build_opt_causal_lm
-from latentdoc.model.vision_encoder.sam import build_sam_vit_b_1024
+from latentdoc.model.vision_encoder.sam_without_patch_embedding import build_sam_vit_b_1024  # without patch embedding
+from latentdoc.model.AE.ae import build_ae_model
+
+
 from transformers import OPTConfig, OPTModel, OPTForCausalLM
 import logging
 from torchvision import transforms
@@ -64,26 +67,37 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         self.model
         self.lm_head
         '''
+        self.ae_model = build_ae_model()
 
         self.vision_encoder = build_sam_vit_b_1024()
 
+        self.ae_projector = nn.Linear(768, 768)
+
         self.mm_projector = nn.Linear(1024, self.config.hidden_size)
 
-
+        self._init_mm_projector()
+        self._init_ae_projector()
 
     def _init_mm_projector(self, ):
         std = self.config.init_std
         self.mm_projector.weight.data.normal_(mean=0.0, std=std)
         if self.mm_projector.bias is not None:
             self.mm_projector.bias.data.zero_()
+    
+    def _init_ae_projector(self, ):
+        std = self.config.init_std
+        self.ae_projector.weight.data.normal_(mean=0.0, std=std)
+        if self.ae_projector.bias is not None:
+            self.ae_projector.bias.data.zero_()
 
-    def init_multimodal_module(self, tokenizer, mm_cfg=None, resume=False):
+    def init_multimodal_module(self, tokenizer, mm_cfg=None, resume=None):
 
         if self.training and not resume:
+
             print('*'*12 + 'initing multimodal module' + '*'*12)
-          
             print('*'*6 + 'init the project' + '*'*6)
             self._init_mm_projector()
+            self._init_ae_projector()
 
             self.config.mm_cfg = mm_cfg
 
@@ -97,19 +111,17 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             self._reload_vision_ckpt()
 
         elif self.training and resume:
-
             self.config.mm_cfg = mm_cfg
 
         elif not self.training:
-
             mm_cfg = self.config.mm_cfg
             self.config.mm_cfg = edict(mm_cfg)
-   
           
         return tokenizer, mm_cfg
 
     def _reload_vision_ckpt(self,):
 
+        # reload the vision encoder weight
         if self.config.mm_cfg.vision_encoder is not None and len(self.config.mm_cfg.vision_encoder) != 0:
             # with open(checkpoint, "rb") as f:
             checkpoint = self.config.mm_cfg.vision_encoder
@@ -119,6 +131,21 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             state_dict = { k[14:]:v for k, v in state_dict.items() if 'image_encoder' in k}
 
             missing_keys, unexpected_keys = self.vision_encoder.load_state_dict(state_dict, strict=False)
+            
+            print(f'missing_keys: {missing_keys}')
+            print(f'unexpected_keys: {unexpected_keys}')
+
+        # reload the ae model weight
+        if self.config.mm_cfg.ae is not None and len(self.config.mm_cfg.ae) != 0:
+
+            # with open(checkpoint, "rb") as f:
+            checkpoint = self.config.mm_cfg.ae
+            print(f'reloading ae model weight from {checkpoint}')
+
+            state_dict = torch.load(checkpoint)
+            state_dict = { k.replace('module.', ''):v for k, v in state_dict.items()}
+
+            missing_keys, unexpected_keys = self.ae_model.load_state_dict(state_dict, strict=False)
             
             print(f'missing_keys: {missing_keys}')
             print(f'unexpected_keys: {unexpected_keys}')
@@ -176,10 +203,23 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
         return self.get_input_embeddings()(input_ids)
 
+
     def embed_images(self, images):
 
+        # add ae encoder
+        # self.ae_model.eval()
+        images = self.ae_model.inc(images)
+        images = self.ae_model.encoder(images)
+     
+        images = images.permute(0, 2, 3, 1)  # b, h, w, c
+
+        images = self.ae_projector(images)
+
+        # without patch embedding
         img_features = self.vision_encoder(images)  # b, l, c
         
+        # print(img_features.shape)
+
         img_features = self.mm_projector(img_features)
 
         return img_features
@@ -254,15 +294,8 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        # print('forward')
-        # self.check(input_ids, images, labels)
-
-        # print(input_ids.shape)
-        # print(images.shape)
-        # print(attention_mask.shape)
-        # print(labels.shape)
-        # exit()
-
+        
+        # print(self.ae_model.inc.double_conv[0].weight[0,0])
         
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -411,12 +444,15 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
         pass
 
+
+
+
 def build_model():
     import torch
     from torch import nn 
     import transformers
     from latentdoc.data.simple_conversation_dataset import SimpleConversationDateset
-    from latentdoc.model.vision_encoder.sam import train_transform
+    from latentdoc.model.AE.ae import build_train_transforms
     from easydict import EasyDict as edict
     
     # build mm_cfg
@@ -438,7 +474,7 @@ def build_model():
     }
     mm_cfg = edict(mm_cfg)
 
-    model_name_or_path = '/home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m'
+    model_name_or_path = '/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/models--facebook--opt-125m'
 
     # build tokenizer
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
@@ -451,13 +487,21 @@ def build_model():
     mm_cfg.im_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_end_token)
     mm_cfg.img_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_start_token)
     mm_cfg.img_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_end_token)
-    mm_cfg.vision_encoder = '/home/yuhaiyang/zlw/pretrained_weight/sam_vit_b_01ec64.pth'
+    mm_cfg.vision_encoder = '/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/sam_vit_b_01ec64.pth'
+    mm_cfg.ae = '/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/ae_bestmodel.pth'
 
     model = LatentDocOPTForCausalLM.from_pretrained(model_name_or_path, ignore_mismatched_sizes=True)
     model.train()
+
     tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
 
-    img_processor = train_transform
+    img_processor = build_train_transforms()
+
+    state_dict = model.state_dict()
+    pretrained_state_dict = torch.load('/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/ae_bestmodel.pth')
+
+    # print(state_dict.keys())
+    # print(pretrained_state_dict.keys())
 
 
     return model, tokenizer, img_processor
@@ -539,10 +583,47 @@ def check_model_parameters():
     print(f'false_keys: {false_keys}')
     
 
+def check_model_parameters_ae():
+    
+
+    model, tokenizer, img_processor = build_model()
+    model_state_dict = model.state_dict()
+
+    vision_state_dict = torch.load("/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/ae_bestmodel.pth")
+
+    true_keys = []
+    false_keys = []
+
+    for k, v in model_state_dict.items():
+
+        if 'ae_model' not in k:
+            continue
+
+        v_ = vision_state_dict[k.replace('ae_model', 'module')]
+
+        if (v_ == v).all():
+            true_keys.append(k)
+        else:
+            false_keys.append(k)
+        
+        # print(f'{k}, {v.size()}')
+    print(f'true_keys: {true_keys}')
+    print(f'false_keys: {false_keys}')
 
 # AutoConfig.register("latentdoc", LatentDocConfig)
 # AutoModelForCausalLM.register(LatentDocConfig, LatentDocOPTForCausalLM)
 
 if __name__ == '__main__':
-    
-    check_model_parameters()
+    from PIL import Image
+    model, tokenizer, img_processor = build_model()
+    model.cuda()
+    img = Image.open('/home/yuhaiyang/zlw/LatentDoc/exps/input.png').convert('RGB')
+    img = img_processor(img).unsqueeze(dim=0)
+    data = {}
+    data['input_ids'] = torch.tensor(torch.arange(1,2000), dtype=torch.long).unsqueeze(dim=0).cuda()
+    data['images'] = img.cuda()
+    data['labels'] = torch.tensor(torch.arange(1,2000), dtype=torch.long).unsqueeze(dim=0).cuda()
+    res = model(**data)
+    print(res.loss)
+
+

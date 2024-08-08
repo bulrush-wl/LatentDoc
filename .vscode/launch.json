@@ -1,7 +1,4 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
@@ -10,10 +7,12 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--model_name_or_path", "/home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m", 
-                    "--vision_encoder", "/home/yuhaiyang/zlw/pretrained_weight/Resnet/resnet152-394f9c45.pth",
+            "args": ["--model_type"  ,"sam_opt_1024_with_ae_with_projector_down4_recon",
+                "--model_name_or_path", "/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/models--facebook--opt-125m", 
+                    "--vision_encoder", "/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/sam_vit_b_01ec64.pth",
                     "--freeze_vision_encoder", "False",
                     "--freeze_lm_model", "False",
+                    "--freeze_ae" ,"False",  
                     "--bf16", "True",
                     "--per_device_train_batch_size", "1",
                     "--gradient_accumulation_steps", "1",
@@ -31,7 +30,7 @@
                     "--per_device_train_batch_size", "1",
                     "--num_train_epochs", "800000",
                     "--learning_rate", "5e-3",    
-                    "--datasets",  "test2",
+                    "--datasets",  "test",
                     "--output_dir", "/home/yuhaiyang/zlw/LatentDoc/exps/test2",
                     "--report_to", "none",
                     ],

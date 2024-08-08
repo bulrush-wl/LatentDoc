@@ -6,11 +6,17 @@ import transformers
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
-    vision_encoder: Optional[str] = field(default="~/.cache/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff/")
+    vision_encoder: Optional[str] = field(default="")
+    ae: Optional[str] = field(default="")
     img_size: int = field(default=512)
+    img_token_len: int = field(default=256)
     use_cache: bool = field(default=False)
     freeze_vision_encoder: bool = field(default=False)
     freeze_lm_model: bool = field(default=False)
+    freeze_ae: bool = field(default=True)
+    model_type: str = field(default="sam_opt_1024")
+    with_ae_loss:bool =field(default=False)
+    ae_loss_weight:float =field(default=10)
    
 
 @dataclass
@@ -28,8 +34,7 @@ class DataArguments:
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
-    resume: Optional[str] = field(default=None)
-    num_cycles: int = field(default=1)
+    resume: bool = field(default=False)
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
     remove_unused_columns: bool = field(default=False)

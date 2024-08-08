@@ -5,74 +5,38 @@ import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from easydict import EasyDict as edict
-from latentdoc.model.llm.opt import build_opt_causal_lm
 from latentdoc.model.vision_encoder.sam import build_sam_vit_b_1024
-from transformers import OPTConfig, OPTModel, OPTForCausalLM
+from transformers import Qwen2Config, Qwen2Model, Qwen2ForCausalLM
+from transformers import Cache, DynamicCache
 import logging
 from torchvision import transforms
 
-def interpolate_positional_encoding(pe, target_length):
-    """
-    Interpolates positional encoding from its original length to the target length.
 
-    Args:
-        pe (torch.Tensor): The original positional encoding tensor of shape (original_length, d_model).
-        target_length (int): The desired length for the positional encoding.
+'''
+qwen2 使用的 sin-cos position embedding
+'''
 
-    Returns:
-        torch.Tensor: The interpolated positional encoding tensor of shape (target_length, d_model).
-    """
-    original_length, d_model = pe.shape
-    pe = pe.permute(1, 0)
-    # Interpolate the positional encoding
-    interpolated_pe = F.interpolate(pe.unsqueeze(0), size=(target_length), mode='linear', align_corners=True)
-    return interpolated_pe.squeeze(0).permute(1, 0)
-
-class OPTLearnedPositionalEmbedding(nn.Embedding):
-    """
-    This module learns positional embeddings up to a fixed maximum size.
-    """
-
-    def __init__(self, num_embeddings: int, embedding_dim: int):
-        # OPT is set up so that if padding_idx is specified then offset the embedding ids by 2
-        # and adjust num_embeddings appropriately. Other models don't have this hack
-        self.offset = 2
-        super().__init__(num_embeddings + self.offset, embedding_dim)
-
-    def forward(self, attention_mask: torch.LongTensor, past_key_values_length: int = 0):
-        """`input_ids_shape` is expected to be [bsz x seqlen]."""
-        attention_mask = attention_mask.long()
-
-        # create positions depending on attention_mask
-        positions = (torch.cumsum(attention_mask, dim=1).type_as(attention_mask) * attention_mask).long() - 1
-
-        # cut positions if `past_key_values_length` is > 0
-        positions = positions[:, past_key_values_length:]
-
-        return super().forward(positions + self.offset)
-
-class LatentDocConfig(OPTConfig):
+class LatentDocConfig(Qwen2Config):
     model_type = "latentdoc"
 
-class LatentDocOPTForCausalLM(OPTForCausalLM):
+class LatentDocQwen2ForCausalLM(Qwen2ForCausalLM):
     config_class = LatentDocConfig
 
-    def __init__(self, config: OPTConfig):
-        super(LatentDocOPTForCausalLM, self).__init__(config)
+    def __init__(self, config: Qwen2Config):
+        super(LatentDocQwen2ForCausalLM, self).__init__(config)
 
         '''
         self.model
+        self.vocab_size
         self.lm_head
         '''
 
         self.vision_encoder = build_sam_vit_b_1024()
-
         self.mm_projector = nn.Linear(1024, self.config.hidden_size)
 
 
-
     def _init_mm_projector(self, ):
-        std = self.config.init_std
+        std = 1 #self.config.init_std
         self.mm_projector.weight.data.normal_(mean=0.0, std=std)
         if self.mm_projector.bias is not None:
             self.mm_projector.bias.data.zero_()
@@ -124,28 +88,12 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             print(f'unexpected_keys: {unexpected_keys}')
 
     def _expand_max_length(self,):
+
         if self.config.mm_cfg.model_max_length > self.config.max_position_embeddings:
-
-            # get the original pe weight, nums and dim
-            original_pe_weight = self.model.decoder.embed_positions.weight
-            num_raw, dim = original_pe_weight.shape[0], original_pe_weight.shape[1]
-
-            # interpolate
-            new_pe_weight = interpolate_positional_encoding(original_pe_weight, self.config.mm_cfg.model_max_length + 2)
-
-            # create a new Embedding
-            new_embed_positoins = OPTLearnedPositionalEmbedding(self.config.mm_cfg.model_max_length, dim)
-
-            # init the weight
-            with torch.no_grad():
-                new_embed_positoins.weight.data = new_pe_weight
-
-            # set 
-            self.model.decoder.embed_positions = new_embed_positoins
-
-            logging.warning(f'the pe of opt model is interpolated from {self.config.max_position_embeddings} to {self.config.mm_cfg.model_max_length}')
-            self.config.max_position_embeddings = self.config.mm_cfg.model_max_length
-            self.model.decoder.max_target_positions = self.config.mm_cfg.model_max_length
+            '''
+            no need to expand
+            '''
+            raise NotImplementedError
         pass
 
     def _resize_embedding(self, tokenizer):
@@ -158,7 +106,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         else:
             num_new_tokens = len(tokenizer) - raw_llm_vocab
 
-            self.resize_token_embeddings(len(tokenizer))  
+            self.resize_token_embeddings(len(tokenizer))  #
 
             # init the new embedding
             input_embeddings = self.get_input_embeddings().weight.data
@@ -203,7 +151,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
                 continue
 
             # check the input
-            if (cur_input_ids == self.config.mm_cfg.im_start_token_id).sum() != (cur_input_ids == self.config.mm_cfg.im_end_token_id).sum() and self.training:
+            if (cur_input_ids == self.config.mm_cfg.im_start_token_id).sum()+1 != (cur_input_ids == self.config.mm_cfg.im_end_token_id).sum() and self.training:
                     raise ValueError("The number of input message start tokens and input message end tokens should be the same.")
 
 
@@ -254,21 +202,12 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        # print('forward')
-        # self.check(input_ids, images, labels)
 
-        # print(input_ids.shape)
-        # print(images.shape)
-        # print(attention_mask.shape)
-        # print(labels.shape)
-        # exit()
-
-        
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = return_dict if return_dict is not None else self.config.return_dict
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # print(inputs_embeds)
         # if images is not None:
@@ -281,17 +220,13 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         if self.training and images is not None:
             img_features = self.embed_images(images)
             inputs_embeds = self.multimodal_process(input_ids, inputs_embeds, img_features)
-        # elif images is None and inputs_embeds is not None:
-        #     multimodal_input_embeddings = inputs_embeds
-        # else:
-        #     print(111)
-        # else:
-        #     raise
+
         
-        outputs = self.model.decoder(
+        # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+        outputs = self.model(
             input_ids=None,
             attention_mask=attention_mask,
-            head_mask=head_mask,
+            position_ids=position_ids,
             past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
@@ -300,21 +235,22 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             return_dict=return_dict,
         )
 
-        logits = self.lm_head(outputs[0]).contiguous()
+        hidden_states = outputs[0]
+        logits = self.lm_head(hidden_states)
+        logits = logits.float()
 
-        # 
         loss = None
         if labels is not None:
-            # move labels to correct device to enable model parallelism
-            labels = labels.to(logits.device)
             # Shift so that tokens < n predict n
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(shift_logits.view(-1, self.config.vocab_size), shift_labels.view(-1))
-
-        
+            shift_logits = shift_logits.view(-1, self.config.vocab_size)
+            shift_labels = shift_labels.view(-1)
+            # Enable model parallelism
+            shift_labels = shift_labels.to(shift_logits.device)
+            loss = loss_fct(shift_logits, shift_labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
@@ -328,50 +264,60 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             attentions=outputs.attentions,
         )
 
+
     def prepare_inputs_for_generation(
-        self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs
+        self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
     ):
-        # print(input_ids)
-        # print('prepare')
-        token_type_ids = kwargs.get("token_type_ids", None)
-        if past_key_values:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
-            if token_type_ids is not None:
-                token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
+        # Omit tokens covered by past_key_values
+        if past_key_values is not None:
+            if isinstance(past_key_values, Cache):
+                cache_length = past_key_values.get_seq_length()
+                past_length = past_key_values.seen_tokens
+                max_cache_length = past_key_values.get_max_length()
+            else:
+                cache_length = past_length = past_key_values[0][0].shape[2]
+                max_cache_length = None
 
-        attention_mask = kwargs.get("attention_mask", None)
+            # Keep only the unprocessed tokens:
+            # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
+            # some of the inputs are exclusively passed as part of the cache (e.g. when passing input_embeds as
+            # input)
+            if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
+                input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+            # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
+            # input_ids based on the past_length.
+            elif past_length < input_ids.shape[1]:
+                input_ids = input_ids[:, past_length:]
+            # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
+
+            # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
+            if (
+                max_cache_length is not None
+                and attention_mask is not None
+                and cache_length + input_ids.shape[1] > max_cache_length
+            ):
+                attention_mask = attention_mask[:, -max_cache_length:]
+
         position_ids = kwargs.get("position_ids", None)
-
         if attention_mask is not None and position_ids is None:
+            # create position_ids on the fly for batch generation
             position_ids = attention_mask.long().cumsum(-1) - 1
             position_ids.masked_fill_(attention_mask == 0, 1)
             if past_key_values:
-                position_ids = position_ids[:, -1].unsqueeze(-1)
-        else:
-            position_ids = None
+                position_ids = position_ids[:, -input_ids.shape[1] :]
 
+        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
-            
         else:
             model_inputs = {"input_ids": input_ids}
-        # if past_key_values is not None:
-        #     print(len(past_key_values))
-        #     print(len(past_key_values[0]))
-        #     print(len(past_key_values[0][0]))
-        #     print(len(past_key_values[0][0][0]))
-        #     print(len(past_key_values[0][0][0][0]))
-        #     print(inputs_embeds.shape)
-        #     print(input_ids.shape)
-        # print(model_inputs.keys())
+
         model_inputs.update(
             {
+                "position_ids": position_ids,
                 "past_key_values": past_key_values,
                 "use_cache": kwargs.get("use_cache"),
-                "position_ids": position_ids,
                 "attention_mask": attention_mask,
-                "token_type_ids": token_type_ids,
-                # "images": kwargs.get("images", None),
             }
         )
         return model_inputs
@@ -381,11 +327,8 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
     ):
 
         img_features = self.embed_images(images)
-        # print(img_features.shape)
         input_embeddings = self.embed_tokens(input_ids)
         multimodal_input_embeddings = self.multimodal_process(input_ids, input_embeddings, img_features)
-        # print(input_embeddings.shape)
-        # print(multimodal_input_embeddings.shape)
 
         return self.generate(input_ids=input_ids, inputs_embeds=multimodal_input_embeddings, **kwargs)
 
@@ -416,7 +359,7 @@ def build_model():
     from torch import nn 
     import transformers
     from latentdoc.data.simple_conversation_dataset import SimpleConversationDateset
-    from latentdoc.model.vision_encoder.sam import train_transform
+    from latentdoc.model.vision_encoder.sam import build_train_transforms
     from easydict import EasyDict as edict
     
     # build mm_cfg
@@ -438,7 +381,7 @@ def build_model():
     }
     mm_cfg = edict(mm_cfg)
 
-    model_name_or_path = '/home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m'
+    model_name_or_path = '/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/models--Qwen--Qwen2-1.5B-Instruct'
 
     # build tokenizer
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
@@ -451,13 +394,13 @@ def build_model():
     mm_cfg.im_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_end_token)
     mm_cfg.img_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_start_token)
     mm_cfg.img_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_end_token)
-    mm_cfg.vision_encoder = '/home/yuhaiyang/zlw/pretrained_weight/sam_vit_b_01ec64.pth'
+    mm_cfg.vision_encoder = '/home/yuhaiyang/zlw/LatentDoc/pretrained_weight/sam_vit_b_01ec64.pth'
 
-    model = LatentDocOPTForCausalLM.from_pretrained(model_name_or_path, ignore_mismatched_sizes=True)
+    model = LatentDocQwen2ForCausalLM.from_pretrained(model_name_or_path, ignore_mismatched_sizes=True)
     model.train()
     tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
 
-    img_processor = train_transform
+    img_processor = build_train_transforms()
 
 
     return model, tokenizer, img_processor
@@ -491,7 +434,7 @@ def test():
     mm_cfg = edict(mm_cfg)
     model_name_or_path = '/home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m'
 
-    model = LatentDocOPTForCausalLM.from_pretrained(model_name_or_path)
+    model = LatentDocQwen2ForCausalLM.from_pretrained(model_name_or_path)
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=2048)
     tokenizer, img_processor = model.init_multimodal_module(tokenizer, mm_cfg)
     
@@ -541,8 +484,18 @@ def check_model_parameters():
 
 
 # AutoConfig.register("latentdoc", LatentDocConfig)
-# AutoModelForCausalLM.register(LatentDocConfig, LatentDocOPTForCausalLM)
+# AutoModelForCausalLM.register(LatentDocConfig, LatentDocQwen2ForCausalLM)
 
 if __name__ == '__main__':
-    
-    check_model_parameters()
+    input_ids = torch.arange(0, 30).reshape((2,15))
+    # print(input_ids)
+    labels = input_ids
+    images = torch.randn((2,3,1024,1024))
+    model, tokenizer, img_processor = build_model()
+
+    res = model(input_ids=input_ids, labels=labels, images=images)
+
+    print(res.loss)
+    print(res.logits.shape)
+    # print(res.loss)
+    # print(res.loss)

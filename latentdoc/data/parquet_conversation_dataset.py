@@ -8,12 +8,29 @@ import torch
 import transformers
 from typing import List, Optional, Tuple, Union, Dict, Sequence
 from torch.utils.data import Dataset
-from latentdoc.utils.constant import DATASET_INFO
 from PIL import Image, ImageFile
+from datasets import load_dataset, concatenate_datasets
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 IGNORE_INDEX = -100
+DATASET_INFO = {
+    'zhongtie_doc': {
+        'images': '/home/yuhaiyang/zlw/dataset/zhongtie_doc/imgs',
+        'annotations': '/home/yuhaiyang/zlw/dataset/zhongtie_doc/parquet',
+    },
+    
+    'test': {
+        'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
+        'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test.json',
+    },
 
+    'test2': {
+        'images': '/home/yuhaiyang/zlw/dataset/Vary-600k/imgs/',
+        'annotations': '/home/yuhaiyang/zlw/dataset/Vary-600k/test2.json',
+    }
+
+}
 
 
 class SimpleConversationDateset(Dataset):
@@ -31,29 +48,15 @@ class SimpleConversationDateset(Dataset):
 
         logging.warning(f"Using {multimodal_cfg['img_token_len']} tokens for representing image")
 
-        list_data_dict = []
-        list_image_path = []
+        self.img_root = DATASET_INFO[datasets]['images']
+        self.parquet_root = DATASET_INFO[datasets]['annotations']
 
-        for name in datasets.split("+"):
-            # for name in vary_data_dict[name_all]:
-            dataset = DATASET_INFO[name]
-
-            data_path = dataset['annotations']
-            data = json.load(open(data_path, "r"))
-
-            list_data_dict.extend(data)
-
-            image_path = dataset['images']
-
-            list_image_path.extend([image_path] * len(data))
-
-            logging.warning(f"Data from {data_path} provide {len(data)} conversations.")
-
-        assert len(list_data_dict) == len(list_image_path)
-        logging.warning(f"{len(list_data_dict)} conversations in total.")
-        a_new_list = list(zip(list_data_dict, list_image_path))
-        random.shuffle(a_new_list)
-        self.list_data_dict, self.list_image_path  = zip(*a_new_list)
+        parquet_files = [ file for file in os.listdir(self.parquet_root) if file.endswith('.parquet')]
+        datasets = []
+        for parquet_file in parquet_files:
+            datasets.append(load_dataset('parquet', data_files=os.path.join(self.parquet_root, parquet_file))['train'])
+        
+        self.parquet_ds = concatenate_datasets(datasets)
 
         self.img_token = self.multimodal_cfg.special_tokens.img_token
         self.img_start_token = self.multimodal_cfg.special_tokens.img_start_token
@@ -130,13 +133,6 @@ class SimpleConversationDateset(Dataset):
 
         # mask targets
         total_len = int(targets.ne(self.tokenizer.pad_token_id).sum())
-
-        # 防止bos，eos和pad三者一样
-        if self.tokenizer.pad_token_id == self.tokenizer.bos_token_id:
-            total_len += 1
-        if self.tokenizer.pad_token_id == self.tokenizer.eos_token_id:
-            total_len += 1
-
         sep = self.im_end_token+self.im_start_token+'gpt:'
         cur_len = 0
         for i, rou in enumerate(rounds):
@@ -186,25 +182,16 @@ class SimpleConversationDateset(Dataset):
         return len(self.list_data_dict)
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        
-        # i = 0
-        # print(self.list_data_dict[i])
-        data = copy.deepcopy(self.list_data_dict[i])
 
-        # process conversations
-        conversations = self.multimodal_process(data["conversations"])
-
-        data_dict = self.token_preprocess(conversations)
-        data_dict = dict(input_ids=data_dict["input_ids"], labels=data_dict["labels"])
-
-        # process image
-        image_path = self.list_image_path[i]
-        image_file = data['image']
+        data = copy.deepcopy(self.parquet_ds[i])
+        input_ids = torch.tensor(data['input_ids'])
+        labels = torch.tensor(data['labels'])
+        img_path = os.path.join(self.img_root, data['img_name']) 
 
         try:
-            image = Image.open(image_path + image_file).convert('RGB')
+            image = Image.open(img_path).convert('RGB')
         except:
-            print(f'cannot identify image file {image_path + image_file}.')
+            print(f'cannot identify image file {img_path}.')
             return self.__getitem__(0)
 
         try:
@@ -213,7 +200,11 @@ class SimpleConversationDateset(Dataset):
             print(f'image {image_file} are broken or grayscale! we thus select 0-th sample instead!')
             return self.__getitem__(0)
 
-        data_dict['images'] = image
+        data_dict = {
+            'images': image,
+            'input_ids': input_ids,
+            'labels': labels
+        }
         
         return data_dict
 
@@ -222,7 +213,7 @@ def test():
     import torch
     from torch import nn 
     import transformers
-    from latentdoc.model.vision_encoder.resnet import build_resnet152_and_img_processor
+    from latentdoc.model.vision_encoder.resnet import build_train_transforms
     from easydict import EasyDict as edict
 
     model_name_or_path = '/home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m'
@@ -251,26 +242,24 @@ def test():
     # print(tokenizer.eos_token)
     # print(tokenizer.pad_token)
     multimodal_cfg = edict(multimodal_cfg)
-    img_processor, _ = build_resnet152_and_img_processor()
+    img_processor = build_train_transforms()
 
     ds = SimpleConversationDateset(datasets='zhongtie_doc', img_processor=img_processor, tokenizer=tokenizer, multimodal_cfg=multimodal_cfg)
     data = ds[0]
 
-    # input_ids = data['input_ids']
-    # labels = data['labels']
-    # img = data['images']
+    input_ids = data['input_ids']
+    labels = data['labels']
+    img = data['images']
 
-    # print(img.shape)
-    # print(input_ids)
-    # print(labels)
+    print(img.shape)
+    print(input_ids)
+    print(labels)
 
-    # print(tokenizer.decode(input_ids))
-    # index = torch.nonzero(labels==-100).squeeze()
-    # labels = labels[index[-1]+1:]
-    
-    # print('labels')
-    # print(labels)
-    # print(tokenizer.decode(labels))
+    print(tokenizer.decode(input_ids))
+    index = torch.nonzero(labels==-100).squeeze()
+    labels = labels[index[-1]+1:]
+
+    print(tokenizer.decode(labels))
 
 if __name__ == '__main__':
     test()

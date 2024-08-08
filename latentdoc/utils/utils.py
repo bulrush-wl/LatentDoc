@@ -233,3 +233,11 @@ def find_all_linear_names(model):
 
     print(lora_module_names)
     return list(lora_module_names)
+
+from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
+from dataclasses import dataclass
+@dataclass
+class CausalLMOutputWithPast_ae(CausalLMOutputWithPast):
+    ae_loss: torch.FloatTensor = None
+    l2_loss: torch.FloatTensor = None
+    gpp_loss: torch.FloatTensor = None

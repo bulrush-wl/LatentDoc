@@ -6,7 +6,7 @@ from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from easydict import EasyDict as edict
 from latentdoc.model.llm.opt import build_opt_causal_lm
-from latentdoc.model.vision_encoder.sam import build_sam_vit_b_1024
+from latentdoc.model.vision_encoder.resnet import build_resnet152
 from transformers import OPTConfig, OPTModel, OPTForCausalLM
 import logging
 from torchvision import transforms
@@ -65,11 +65,11 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         self.lm_head
         '''
 
-        self.vision_encoder = build_sam_vit_b_1024()
+        self.vision_encoder = build_resnet152()
 
-        self.mm_projector = nn.Linear(1024, self.config.hidden_size)
+        self.mm_projector = nn.Linear(2048, self.config.hidden_size)
 
-
+        self._init_mm_projector()
 
     def _init_mm_projector(self, ):
         std = self.config.init_std
@@ -77,16 +77,21 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         if self.mm_projector.bias is not None:
             self.mm_projector.bias.data.zero_()
 
-    def init_multimodal_module(self, tokenizer, mm_cfg=None, resume=False):
+    def init_multimodal_module(self, tokenizer, mm_cfg=None):
 
-        if self.training and not resume:
+        if self.training:
             print('*'*12 + 'initing multimodal module' + '*'*12)
-          
-            print('*'*6 + 'init the project' + '*'*6)
-            self._init_mm_projector()
+            # self.num_new_tokens = tokenizer.add_special_tokens({
+            # 'additional_special_tokens': list(mm_cfg.special_tokens.values())
+            # })
+
+            # mm_cfg.img_patch_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_patch_token)
+            # mm_cfg.im_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_start_token)
+            # mm_cfg.im_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_end_token)
+            # mm_cfg.img_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_start_token)
+            # mm_cfg.img_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_end_token)
 
             self.config.mm_cfg = mm_cfg
-
             print('*'*6 + 'resizing the embedding' + '*'*6)
             self._resize_embedding(tokenizer)
 
@@ -95,28 +100,22 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
             print('*'*6 + 'reloading the vision ckpy' + '*'*6)
             self._reload_vision_ckpt()
-
-        elif self.training and resume:
-
-            self.config.mm_cfg = mm_cfg
-
-        elif not self.training:
-
+        else:
             mm_cfg = self.config.mm_cfg
             self.config.mm_cfg = edict(mm_cfg)
-   
           
+
         return tokenizer, mm_cfg
 
     def _reload_vision_ckpt(self,):
 
-        if self.config.mm_cfg.vision_encoder is not None and len(self.config.mm_cfg.vision_encoder) != 0:
+        if self.config.mm_cfg.vision_encoder is not None:
             # with open(checkpoint, "rb") as f:
             checkpoint = self.config.mm_cfg.vision_encoder
             print(f'reloading vision encoder weight from {checkpoint}')
 
             state_dict = torch.load(checkpoint)
-            state_dict = { k[14:]:v for k, v in state_dict.items() if 'image_encoder' in k}
+            # state_dict = { k[14:]:v for k, v in state_dict.items() if 'image_encoder' in k}
 
             missing_keys, unexpected_keys = self.vision_encoder.load_state_dict(state_dict, strict=False)
             
@@ -186,7 +185,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
     def multimodal_process(self, input_ids, input_embeddings, img_features):
 
-        dummy_image_features = torch.zeros(256, 1024, device=input_embeddings.device, dtype=input_embeddings.dtype)
+        dummy_image_features = torch.zeros(256, 2048, device=input_embeddings.device, dtype=input_embeddings.dtype)
         dummy_image_features = self.mm_projector(dummy_image_features)
 
         new_input_embeds = []
@@ -235,6 +234,28 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
         inputs_embeds = torch.stack(new_input_embeds, dim=0)
         return inputs_embeds
     
+    def check(self, input_ids, images, labels):
+
+        print(self.tokenizer.decode(input_ids[0]))
+        index = torch.nonzero(labels[0]==-100).squeeze()
+        labels = labels[0][index[-1]+1:]
+        print(self.tokenizer.decode(labels))
+
+        from torchvision import transforms
+        unloader = transforms.ToPILImage()
+        image = images.cpu().clone()
+        print(image.shape)
+        image = image.squeeze(0)
+        image = unloader(image)
+        image.save('/home/yuhaiyang/zlw/Vary-toy-main/test.png')
+        # print(type(input_ids))
+        # print(type(labels))
+        # print(self.tokenizer.decode(input_ids))
+        # print(self.tokenizer.decode(labels))
+        
+
+        pass
+
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -328,6 +349,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             attentions=outputs.attentions,
         )
 
+
     def prepare_inputs_for_generation(
         self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs
     ):
@@ -389,37 +411,15 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
 
         return self.generate(input_ids=input_ids, inputs_embeds=multimodal_input_embeddings, **kwargs)
 
-    def check(self, input_ids, images, labels):
-
-        print(self.tokenizer.decode(input_ids[0]))
-        index = torch.nonzero(labels[0]==-100).squeeze()
-        labels = labels[0][index[-1]+1:]
-        print(self.tokenizer.decode(labels))
-
-        from torchvision import transforms
-        unloader = transforms.ToPILImage()
-        image = images.cpu().clone()
-        print(image.shape)
-        image = image.squeeze(0)
-        image = unloader(image)
-        image.save('/home/yuhaiyang/zlw/Vary-toy-main/test.png')
-        # print(type(input_ids))
-        # print(type(labels))
-        # print(self.tokenizer.decode(input_ids))
-        # print(self.tokenizer.decode(labels))
-        
-
-        pass
 
 def build_model():
     import torch
     from torch import nn 
     import transformers
     from latentdoc.data.simple_conversation_dataset import SimpleConversationDateset
-    from latentdoc.model.vision_encoder.sam import train_transform
+    from latentdoc.model.vision_encoder.resnet import build_resnet152_and_img_processor
     from easydict import EasyDict as edict
     
-    # build mm_cfg
     special_tokens = {
             'img_token': '<image>',
             'img_patch_token': '<img_patch>',
@@ -428,37 +428,22 @@ def build_model():
             'img_start_token': '<img>',
             'img_end_token': '</img>',
     }
+
     mm_cfg = {
         'img_token_len': 256,
-        'model_max_length': 2048,
+        'model_max_length': 3000,
         'output_attentions': True,
         'output_hidden_states': True,
         'return_dict': True,
         'special_tokens': special_tokens
     }
-    mm_cfg = edict(mm_cfg)
 
+    mm_cfg = edict(mm_cfg)
     model_name_or_path = '/home/yuhaiyang/zlw/pretrained_weight/models--facebook--opt-125m'
 
-    # build tokenizer
-    tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
-    num_new_tokens = tokenizer.add_special_tokens({
-            'additional_special_tokens': list(mm_cfg.special_tokens.values())
-            })
-
-    mm_cfg.img_patch_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_patch_token)
-    mm_cfg.im_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_start_token)
-    mm_cfg.im_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.im_end_token)
-    mm_cfg.img_start_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_start_token)
-    mm_cfg.img_end_token_id = tokenizer.convert_tokens_to_ids(mm_cfg.special_tokens.img_end_token)
-    mm_cfg.vision_encoder = '/home/yuhaiyang/zlw/pretrained_weight/sam_vit_b_01ec64.pth'
-
-    model = LatentDocOPTForCausalLM.from_pretrained(model_name_or_path, ignore_mismatched_sizes=True)
-    model.train()
-    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
-
-    img_processor = train_transform
-
+    model = LatentDocOPTForCausalLM.from_pretrained(model_name_or_path)
+    tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=2048)
+    tokenizer, img_processor = model.init_multimodal_module(tokenizer, mm_cfg)
 
     return model, tokenizer, img_processor
 
@@ -513,32 +498,25 @@ def test():
 
 
 def check_model_parameters():
-    from latentdoc.model.vision_encoder.sam import build_sam_vit_b_1024
-
+    from latentdoc.model.vision_encoder.sam import build_sam_vit_b
     model, tokenizer, img_processor = build_model()
     model_state_dict = model.state_dict()
-
-    vision_encoder = build_sam_vit_b_1024()
+    img_processor, vision_encoder = build_resnet152_and_img_processor()
     vision_state_dict = vision_encoder.state_dict()
-
-    true_keys = []
-    false_keys = []
-
     for k, v in model_state_dict.items():
         if 'vision' not in k:
             continue
         v_ = vision_state_dict[k[15:]]
-
-        if (v_ == v).all():
-            true_keys.append(k)
-        else:
-            false_keys.append(k)
-        
+        print(v_ == v)
         # print(f'{k}, {v.size()}')
-    print(f'true_keys: {true_keys}')
-    print(f'false_keys: {false_keys}')
+    # print(model_state_dict[''])
+    # print(model_state_dict['vision_encoder.bn1.bias'])
     
 
+    
+    # print(vision_state_dict['bn1.bias'])
+    # for k, v in vision_state_dict.items():
+    #     print(f'{k}, {v.size()}')
 
 # AutoConfig.register("latentdoc", LatentDocConfig)
 # AutoModelForCausalLM.register(LatentDocConfig, LatentDocOPTForCausalLM)
