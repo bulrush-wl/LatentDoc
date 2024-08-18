@@ -364,7 +364,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
             GPP_criterion=GradientPriorLoss()
             loss_fct = CrossEntropyLoss()
             ae_loss = loss_fct(shift_logits.view(-1, self.config.vocab_size), shift_labels.view(-1))
-            print('self.with_ae_loss',self.config.mm_cfg.with_ae_loss)
+            # print('self.with_ae_loss',self.config.mm_cfg.with_ae_loss)
             if self.config.mm_cfg.with_ae_loss==True:
                 # print('celoss=',loss)
                 l2_loss=criterion(recon,raw_images)
@@ -372,7 +372,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
                 gpp_loss=GPP_criterion(recon,raw_images)*1e-2
                 # print('gpploss=',gpp_loss)
                 loss=ae_loss+(l2_loss+gpp_loss)*self.config.mm_cfg.ae_loss_weight
-                print(self.config.mm_cfg.ae_loss_weight)
+                # print(self.config.mm_cfg.ae_loss_weight)
             else:
                 loss=ae_loss
 
