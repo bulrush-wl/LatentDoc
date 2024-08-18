@@ -379,7 +379,7 @@ def infer_single_img(model, img,  transform):
 
     return input_img, recon_img
 
-def build_train_transform(img_size=1024):
+def build_train_transforms(img_size=1024):
     transform= transforms.Compose(
         [
             transforms.Resize((img_size, img_size), interpolation=transforms.InterpolationMode.BILINEAR),
@@ -389,7 +389,7 @@ def build_train_transform(img_size=1024):
     )
     return transform
 
-def build_test_transform(img_size=1024):
+def build_test_transforms(img_size=1024):
     transform= transforms.Compose(
         [
             transforms.Resize((img_size, img_size), interpolation=transforms.InterpolationMode.BILINEAR),
