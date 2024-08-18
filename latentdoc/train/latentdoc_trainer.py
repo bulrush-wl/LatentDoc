@@ -79,7 +79,7 @@ class LatentDocTrainer_ae(Trainer):
 
         return loss.detach() / self.args.gradient_accumulation_steps
 
-    def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval):
+    def _maybe_log_save_evaluate(self, tr_loss,grad_norm, model, trial, epoch, ignore_keys_for_eval):
         # print('in_mine')
         if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
             logs: Dict[str, float] = {}
