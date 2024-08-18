@@ -386,7 +386,7 @@ class LatentDocQwen2ForCausalLM(OPTForCausalLM):
         )
         return model_inputs
 
-   def multimodal_generate(self, input_ids, images, inputs_embeds=None, **kwargs):
+    def multimodal_generate(self, input_ids, images, inputs_embeds=None, **kwargs):
 
         img_features = self.embed_images(images)
         input_embeddings = self.embed_tokens(input_ids)

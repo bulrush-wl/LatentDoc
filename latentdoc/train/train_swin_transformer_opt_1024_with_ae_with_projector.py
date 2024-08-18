@@ -27,33 +27,11 @@ from easydict import EasyDict as edict
 from latentdoc.utils.constant import MM_CFG
 from latentdoc.utils.arguments import *
 from latentdoc.data import make_supervised_data_module
-from latentdoc.train.latentdoc_trainer import LatentDocTrainer, LatentDocTrainer_ae
+from latentdoc.train.latentdoc_trainer import LatentDocTrainer
+from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4 import LatentDocOPTForCausalLM, LatentDocConfig
+from latentdoc.model.AE.ae import build_train_transforms
 
-def customer_import(model_type):
 
-    global LatentDocOPTForCausalLM, LatentDocConfig, build_train_transforms
-
-    if model_type == 'sam_opt_1024_with_ae':
-        from latentdoc.model.sam_opt_1024_with_ae import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_train_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae_down4':
-        from latentdoc.model.sam_opt_1024_with_ae_down4 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_train_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae_with_projector_down2':
-        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down2 import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_train_transforms
-
-    elif model_type == 'sam_opt_1024_with_ae_with_projector_down4_recon':
-        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_train_transforms
-    elif model_type == 'sam_opt_1024_with_ae_with_projector_down4_recon_test':
-        from latentdoc.model.sam_opt_1024_with_ae_with_projector_down4_recon_test import LatentDocOPTForCausalLM, LatentDocConfig
-        from latentdoc.model.AE.ae import build_train_transforms
-    else:
-        print(f'There is no {model_type}')
-        exit()
 
 def init_tokenizer(model_name_or_path, mm_cfg):
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, padding_side="right", model_max_length=mm_cfg.model_max_length )
@@ -69,15 +47,11 @@ def init_tokenizer(model_name_or_path, mm_cfg):
 
     return tokenizer, mm_cfg
 
-
 def train():
     
     # parse the argument 
     parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    # perform customer import
-    customer_import(model_args.model_type)
 
     # build and init the mmcfg 
     mm_cfg = deepcopy(MM_CFG)
@@ -86,10 +60,7 @@ def train():
     mm_cfg.img_size = model_args.img_size
     mm_cfg.img_token_len = model_args.img_token_len
     mm_cfg.ae = model_args.ae
-    if model_args.with_ae_loss==True:
-        mm_cfg.ae_loss_weight=model_args.ae_loss_weight
-        mm_cfg.with_ae_loss=model_args.with_ae_loss
-    print(model_args)
+    
     # build and init the tokenizer
     tokenizer, mm_cfg = init_tokenizer(model_args.model_name_or_path, mm_cfg)
 
@@ -99,7 +70,7 @@ def train():
     # build and init the model
     model = LatentDocOPTForCausalLM.from_pretrained(model_args.model_name_or_path)
     model.train()
-    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg)
+    tokenizer, mm_cfg = model.init_multimodal_module(tokenizer, mm_cfg, resume=training_args.resume)
 
 
     dtype = torch.float32
@@ -120,10 +91,9 @@ def train():
 
     # freeze the ae_model
     if model_args.freeze_ae:
-        try:
-            model.ae_model.requires_grad_(False)
-        except:
-            print(f'There is no ae model, freeze_ae will not perform.')
+        if model_args.is_ae_eval:
+            model.ae_model.eval()
+        model.ae_model.requires_grad_(False)
 
     params_grad = [p.numel() for n, p in model.named_parameters() if p.requires_grad]
     print(f"Number of Mapping Trainable Parameters: {sum(params_grad) / (1 << 20):.2f} M")
@@ -138,22 +108,12 @@ def train():
 
     # ds = data_module['train_dataset']
     # print(ds[0])
-    print('model_args.model_type',model_args.model_type)
-    if model_args.model_type=='sam_opt_1024_with_ae_with_projector_down4_recon'or \
-    model_args.model_type=='sam_opt_1024_with_ae_with_projector_down4_recon_test':
-        print('yes')
-        trainer = LatentDocTrainer_ae(
-            model=model,
-            tokenizer=tokenizer,
-            args=training_args,
-            **data_module)
-    else:
-        print('no')
-        trainer = LatentDocTrainer(
-            model=model,
-            tokenizer=tokenizer,
-            args=training_args,
-            **data_module)
+    trainer = LatentDocTrainer(
+        model=model,
+        tokenizer=tokenizer,
+        args=training_args,
+        **data_module)
+
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
