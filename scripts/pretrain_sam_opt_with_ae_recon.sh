@@ -1,12 +1,12 @@
 DS_SKIP_CUDA_CHECK=1   \
-deepspeed   --include "localhost:0" --master_port 29500  /home/yuhaiyang/zyl/code/LatentDoc/latentdoc/train/train_sam_opt_1024_with_ae_recon.py   \
-            --deepspeed /home/yuhaiyang/zyl/code/LatentDoc/zero_config/zero0.json \
+deepspeed   --include "localhost:0,1,2,3,4,5,6,7" --master_port 29500  /home/fdu02/fdu02_dir/lw/code/LatentDoc/latentdoc/train/train_sam_opt_1024_with_ae_recon.py  \
+            --deepspeed /home/fdu02/fdu02_dir/lw/code/LatentDoc/zero_config/zero0.json \
             --model_type  sam_opt_1024_with_ae_with_projector_down4_recon  \
-            --model_name_or_path   /home/yuhaiyang/zyl/code/LatentDoc/pretrained_weight/models--facebook--opt-125m               \
-            --vision_encoder    /home/yuhaiyang/zyl/code/LatentDoc/pretrained_weight/sam_vit_b_01ec64.pth \
-            --ae /home/yuhaiyang/zyl/code/LatentDoc/pretrained_weight/ae_bestmodel.pth   \
+            --model_name_or_path   /home/fdu02/fdu02_dir/lw/pretrained_weight/models--facebook--opt-125m               \
+            --vision_encoder    /home/fdu02/fdu02_dir/lw/pretrained_weight/sam_vit/sam_vit_b_01ec64.pth \
+            --ae /home/fdu02/fdu02_dir/lw/pretrained_weight/ae_bestmodel.pth   \
             --with_ae_loss True  \
-            --ae_loss_weight 11 \
+            --ae_loss_weight 10 \
             --img_size 1024    \
             --img_token_len 64 \
             --freeze_vision_encoder False    \
@@ -19,8 +19,8 @@ deepspeed   --include "localhost:0" --master_port 29500  /home/yuhaiyang/zyl/cod
             --gradient_accumulation_steps 1     \
             --evaluation_strategy "no"    \
             --save_strategy "steps"    \
-            --save_steps 2   \
-            --save_total_limit 10   \
+            --save_steps 500   \
+            --save_total_limit 100   \
             --weight_decay 0.05    \
             --warmup_ratio 0.15   \
             --lr_scheduler_type 'cosine_with_restarts' \
@@ -29,8 +29,8 @@ deepspeed   --include "localhost:0" --master_port 29500  /home/yuhaiyang/zyl/cod
             --gradient_checkpointing True     \
             --dataloader_num_workers 12      \
             --report_to none       \
-            --per_device_train_batch_size 2  \
-            --num_train_epochs 500000         \
+            --per_device_train_batch_size 6  \
+            --num_train_epochs 50         \
             --learning_rate 5e-5        \
-            --datasets  test    \
-            --output_dir /home/yuhaiyang/zyl/code/LatentDoc/exps/recon_test_4    \
+            --datasets  pdf_cn_30k+pdf_en_30k    \
+            --output_dir /home/fdu02/fdu02_dir/zyl/exp/"(8-14)input_1024_token_num_64_recon_first"    \

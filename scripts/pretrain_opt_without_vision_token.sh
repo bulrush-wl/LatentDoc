@@ -1,8 +1,8 @@
 DS_SKIP_CUDA_CHECK=1   \
-deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500  /home/yuhaiyang/zyl/code/LatentDoc/latentdoc/train/train_sam_opt_without_vision_token.py   \
-            --deepspeed /home/yuhaiyang/zlw/LatentDoc/zero_config/zero0.json \
+deepspeed   --include "localhost:0,1,2,3,4,5,6,7" --master_port 29500  /home/fdu02/fdu02_dir/lw/code/LatentDoc/latentdoc/train/train_sam_opt_without_vision_token.py   \
+            --deepspeed /home/fdu02/fdu02_dir/lw/code/LatentDoc/zero_config/zero0.json \
             --model_type  sam_opt_1024_with_ae_down4  \
-            --model_name_or_path   /home/yuhaiyang/zlw/LatentDoc/pretrained_weight/models--facebook--opt-125m               \
+            --model_name_or_path   /home/fdu02/fdu02_dir/lw/pretrained_weight/models--facebook--opt-125m              \
             --img_size 1024    \
             --img_token_len 256 \
             --freeze_vision_encoder True    \
@@ -14,8 +14,8 @@ deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500  /home/yuhaiya
             --gradient_accumulation_steps 1     \
             --evaluation_strategy "no"    \
             --save_strategy "steps"    \
-            --save_steps 5    \
-            --save_total_limit 10   \
+            --save_steps 500    \
+            --save_total_limit 100   \
             --weight_decay 0.05    \
             --warmup_ratio 0.15   \
             --lr_scheduler_type 'cosine_with_restarts' \
@@ -24,8 +24,8 @@ deepspeed   --include "localhost:0,1,2,3,4,5" --master_port 29500  /home/yuhaiya
             --gradient_checkpointing True     \
             --dataloader_num_workers 12      \
             --report_to none       \
-            --per_device_train_batch_size 1  \
-            --num_train_epochs 5         \
+            --per_device_train_batch_size 32\
+            --num_train_epochs 50         \
             --learning_rate 5e-5        \
-            --datasets  zhongtie_doc    \
-            --output_dir /home/yuhaiyang/zlw/LatentDoc/exps/test2    \
+            --datasets  pdf_cn_30k+pdf_en_30k   \
+            --output_dir /home/fdu02/fdu02_dir/zyl/exp/"(8-18)opt_without_img_token"    \

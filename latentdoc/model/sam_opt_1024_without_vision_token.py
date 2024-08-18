@@ -243,7 +243,7 @@ class LatentDocOPTForCausalLM(OPTForCausalLM):
                 # print(self.img_patch_token_id)
             cur_input_embeds = cur_input_embeds + (0. * dummy_image_features).sum()
             new_input_embeds.append(cur_input_embeds)
-            print('pure llm')
+            # print('pure llm')
             continue
 
             # check the input
